@@ -1,0 +1,49 @@
+cd robot_action_latent
+tmux new -s cuda0
+conda activate prise
+
+cd robot_action_latent
+tmux new -s cuda1
+conda activate prise
+
+cd robot_action_latent
+tmux new -s cuda2
+conda activate prise
+
+tensorboard --logdir=runs
+
+tmux new -s 
+
+--------------------------------------------------
+
+
+python model_seer_mms_ori2.py && python eval_goal_each_cuda0_seer_mms_ori2.py && python model_seer_mms_ori2_ones.py && python eval_goal_each_cuda0_seer_mms_ori2_ones.py
+
+python model_seer_mms_ori.py && python eval_goal_each_cuda1_seer_mms_ori.py
+python model_seer_mms_ori_ones.py && python eval_goal_each_cuda1_seer_mms_ori_ones.py
+
+python model_seer_mms_ori3.py && python eval_goal_each_cuda2_seer_mms_ori3.py
+python model_seer_mms_ori3_ones.py && python eval_goal_each_cuda2_seer_mms_ori3_ones.py
+
+
+--------------------------------------------------
+
+python model_mms_all.py && python eval_goal_each_cuda0_mms_all.py && 
+python model_mms.py && python eval_goal_each_cuda0_mms.py && 
+python model_mms_90g.py && python eval_goal_each_cuda0_mms_90g.py
+
+python model_hotl_seer_mms_all.py && python eval_goal_each_cuda1_hotl_seer_mms_all.py && 
+python model_hotl_seer_mms.py && python eval_goal_each_cuda1_hotl_seer_mms.py && 
+python model_hotl_seer_mms_90g.py && python eval_goal_each_cuda1_hotl_seer_mms_90g.py
+
+python model_seer_mms_all.py && python eval_goal_each_cuda2_seer_mms_all.py && 
+python model_seer_mms.py && python eval_goal_each_cuda2_seer_mms.py && 
+python model_seer_mms_90g.py && python eval_goal_each_cuda2_seer_mms_90g.py
+
+--------------------------------------------------
+
+python read_pickle.py performance_hotl_mms.pkl performance_seer_mms.pkl performance_hotl_seer_mms.pkl
+
+python read_results.py performance_hotl_seer_mms_gall.pkl performance_mms_gall.pkl performance_seer_mms_gall.pkl
+
+python read_results.py performance_seer_mms_ori.pkl performance_seer_mms_ori3.pkl
