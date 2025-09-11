@@ -147,8 +147,8 @@ for i in tqdm(range(10)):
                 history_obs_embed = torch.concat(obs_agent_history, dim=1)
                 history_obs_wrist = torch.concat(obs_wrist_history, dim=1)
                 history_obs_state = torch.concat(obs_state_history, dim=1)
-                if step % N_FUTURE == 0:
-                    z_q, _, _, _ = agent.seer_module(history_obs_embed, history_obs_wrist, history_obs_state, task_embedding)   
+                
+                z_q, _, _, _ = agent.seer_module(history_obs_embed, history_obs_wrist, history_obs_state, task_embedding)   
 
 
                 decoder_input = z_q

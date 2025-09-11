@@ -14,7 +14,6 @@ import numpy as np
 import time
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.distributed import init_process_group, destroy_process_group, gather
 from libero.libero import benchmark
 import utils.misc as utils
@@ -26,7 +25,7 @@ from collections import defaultdict, deque
 from tokenizer_api import Tokenizer
 from tqdm import tqdm
 
-from model_seer_mms_ori import *
+from model_mms_ori import *
 
 torch.backends.cudnn.benchmark = True
 SEED = 0
@@ -41,16 +40,13 @@ cudnn.benchmark = False
 cudnn.deterministic = True
 random.seed(SEED)
 
-#################### ARGUMENTS #####################
-DEVICE = 'cuda:1'
+DEVICE = 'cuda:0'
 DOWNSTREAM_TASK_SUITE = 'libero_goal'
 NUM_EVAL_EPI = 20
 EVAL_MAX_STEP = 600
 
-RESULT_FILE_NAME = "performance_seer_mms_ori.pkl"
-AGENT_PATH_PREFIX = "/data/libero/exp_each/s2g_seer_mms_ori"
-#################### ARGUMENTS #####################
-
+RESULT_FILE_NAME = "performance_mms.pkl"
+AGENT_PATH_PREFIX = "/data/libero/exp_each/s3g_mms"
 
 for i in tqdm(range(10)):
     agent = MYMODEL().to(DEVICE)
@@ -59,17 +55,18 @@ for i in tqdm(range(10)):
     agent.decoder_head.training = False
     agent.decoder_head.low_eval_noise = True
     
+    agent.a_quantizer.to(DEVICE)
     eval_until_episode = utils.Until(NUM_EVAL_EPI)
     # num_tasks_per_gpu = (90//self.world_size) + 1
 
     agent_path = AGENT_PATH_PREFIX + "_task_{}.pt".format(i)
     print(agent_path)
     agent.load_state_dict(torch.load(agent_path))
-
+    
     N_HISTORY = agent.time_step
     N_FUTURE = agent.future_step
     N_TOTAL_STEP = agent.total_step
-    
+
     ### Setup eval environment
     benchmark_dict = benchmark.get_benchmark_dict()
     task_suite = benchmark_dict[DOWNSTREAM_TASK_SUITE]()
@@ -87,11 +84,6 @@ for i in tqdm(range(10)):
     while eval_until_episode(episode):
         time_step = eval_env.reset()
         step, q_res = 0, None
-
-        obs_agent_history = []
-        obs_wrist_history = []
-        obs_state_history = []
-
         while step < EVAL_MAX_STEP:
             if time_step['done']:
                 success += 1
@@ -103,7 +95,7 @@ for i in tqdm(range(10)):
                 state     = time_step.state 
                 
                 ### Encode the current timestep
-                task_embedding = torch.torch.as_tensor(task_embedding, device=DEVICE).unsqueeze(1)
+                task_embedding = torch.torch.as_tensor(task_embedding, device=DEVICE)
                 obs_agent = torch.torch.as_tensor(obs_agent.copy(), device=DEVICE).unsqueeze(0)
                 obs_wrist = torch.torch.as_tensor(obs_wrist.copy(), device=DEVICE).unsqueeze(0)
                 state     = torch.torch.as_tensor(state, device=DEVICE).unsqueeze(0)
@@ -112,44 +104,21 @@ for i in tqdm(range(10)):
                 
                 obs_embed = obs_agent.reshape(-1, num_channel, img_size, img_size).float()
                 obs_embed = agent.encoder.forward(obs_embed)
-                cur_obs_embed = obs_embed.reshape(n_step, -1)
-
+                cur_obs = obs_embed.reshape(n_step, -1)
+                
                 obs_wrist = obs_wrist.reshape(-1, num_channel, img_size, img_size).float()
-                obs_wrist = agent.encoder_wrist.forward(obs_wrist)
-                cur_obs_wrist = obs_wrist.reshape(n_step, -1)
+                obs_wrist = agent.wrist_encoder.forward(obs_wrist)
+                cur_wrist = obs_wrist.reshape(n_step, -1)
                 
                 obs_state = state.float()
-                obs_state = agent.encoder_state.forward(obs_state)
+                obs_state = agent.state_encoder.forward(obs_state)
                 cur_state = obs_state.reshape(n_step, -1)
 
+                if step % N_FUTURE == 0 or q_res is None:
+                    hl_policy_input = torch.concat([cur_obs, cur_wrist, cur_state, task_embedding], dim=1).float()
 
-                if len(obs_agent_history) == N_HISTORY:
-                    obs_agent_history = obs_agent_history[1:]
-
-                while len(obs_agent_history) < N_HISTORY:
-                    obs_agent_history = obs_agent_history + [cur_obs_embed.unsqueeze(-2), ]
-
-                    
-                if len(obs_wrist_history) == N_HISTORY:
-                    obs_wrist_history = obs_wrist_history[1:]
-
-                while len(obs_wrist_history) < N_HISTORY:
-                    obs_wrist_history = obs_wrist_history + [cur_obs_wrist.unsqueeze(-2), ]
-                    
-                    
-                if len(obs_state_history) == N_HISTORY:
-                    obs_state_history = obs_state_history[1:]
-
-                while len(obs_state_history) < N_HISTORY:
-                    obs_state_history = obs_state_history + [cur_state.unsqueeze(-2), ]
-
-
-                history_obs_embed = torch.concat(obs_agent_history, dim=1)
-                history_obs_wrist = torch.concat(obs_wrist_history, dim=1)
-                history_obs_state = torch.concat(obs_state_history, dim=1)
-                
-                z_q, _, _, _ = agent.seer_module(history_obs_embed, history_obs_wrist, history_obs_state, task_embedding)   
-
+                    z_policy = agent.hl_policy(hl_policy_input)   
+                    q_loss, z_q, _, _, _ = agent.a_quantizer.forward(z_policy)
 
                 decoder_input = z_q
                 joint_action, eef_action = agent.decoder(decoder_input)
@@ -162,8 +131,9 @@ for i in tqdm(range(10)):
                 else:
                     eef_action[0][0] = 1
 
-                action = np.concatenate([joint_action, eef_action[0]], axis=-1)
-                    
+                action = np.concatenate([joint_action, eef_action[0]], dim=-1)
+
+
             time_step = eval_env.step(action)
             step += 1
         episode += 1
@@ -181,3 +151,5 @@ for i in tqdm(range(10)):
         pickle.dump(performance, f)
     eval_env.close()
 print(f'=====================End Evaluation=====================')
+
+    

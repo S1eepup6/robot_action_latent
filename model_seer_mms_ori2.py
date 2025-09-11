@@ -295,7 +295,7 @@ if __name__ == "__main__":
         assert STAGE in [1, 2, 5], "Stage must be 1, 2"
 
         pretraining_data_dirs = []
-        for task_id in range(1): 
+        for task_id in range(10): 
             benchmark_dict = benchmark.get_benchmark_dict()
             task_suite = benchmark_dict['libero_goal']()
             task = task_suite.get_task(task_id)
@@ -324,13 +324,13 @@ if __name__ == "__main__":
         optim = torch.optim.Adam(m.parameters(), lr=0.001)
 
         # Stage 1 
-        # for i in tqdm(range(200010)):
-        #     loss = m.update(next(replay_dataset), optim, stage=1, cur_step=i)
-        #     writer.add_scalar("loss/stage1", loss, i)
+        for i in tqdm(range(200010)):
+            loss = m.update(next(replay_dataset), optim, stage=1, cur_step=i)
+            writer.add_scalar("loss/stage1", loss, i)
 
-        #     if i % 10000 == 0:
-        #         torch.save(m.state_dict(), s1_pt_name)
-        # torch.save(m.state_dict(), s1_pt_name)
+            if i % 10000 == 0:
+                torch.save(m.state_dict(), s1_pt_name)
+        torch.save(m.state_dict(), s1_pt_name)
         
         del replay_loader
         del replay_dataset

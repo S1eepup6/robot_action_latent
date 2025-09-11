@@ -293,7 +293,7 @@ if __name__ == "__main__":
         assert STAGE in [1, 2, 5], "Stage must be 1, 2"
 
         pretraining_data_dirs = []
-        for task_id in range(1): 
+        for task_id in range(10): 
             benchmark_dict = benchmark.get_benchmark_dict()
             task_suite = benchmark_dict['libero_goal']()
             task = task_suite.get_task(task_id)

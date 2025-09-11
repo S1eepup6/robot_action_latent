@@ -23,15 +23,12 @@ from pathlib import Path
 
 import datetime as dt
 
-from models.idm import IDM_MASKED_ATTN
-from models.fdm import *
+from models.idm_mm_ones import IDM_SEER_NORM, IDM_SEER_STATE
+from models.fdm_mm_ones import FDM_SEER_NORM, FDM_SEER_STATE
 from models.hl_policy import *
-# from models.decoder import *
-from models.seer_encoder_ori_2 import *
-from models.vit import ViT
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:2'
+DEVICE = 'cuda:1'
 
 TRAIN = True
 SEED = 0
@@ -43,9 +40,10 @@ N_FUTURE_STEP = 2
 
 
 now = dt.datetime.now().strftime("%m-%d_%H:%M")
-s1_pt_name = "/data/libero/exp_results/s1g_seer_mms_ori3_ones.pt".format(now, SEED)
-s2_pt_prefix = "/data/libero/exp_each/s2g_seer_mms_ori3_ones"
+s1_pt_name = "/data/libero/exp_results/s1g_mms_ori_ones.pt"
+s2_pt_prefix = "/data/libero/exp_each/s2g_mms_ori_ones"
 #################### ARGUMENTS #####################
+
 
 class DECODER_MM(nn.Module):
     def __init__(self,
@@ -86,7 +84,7 @@ class DECODER_MM(nn.Module):
     def forward(self, x):
         l = self.base_module(x)
         return self.joint_actor(l), self.eef_selector(l)
-    
+
 def construct_task_data_path(root_dir, task_name, task_data_dir_suffix='framestack1'):
     return Path(root_dir) / (task_name.lower()+('' if not task_data_dir_suffix or task_data_dir_suffix == 'None' else task_data_dir_suffix))
 
@@ -110,30 +108,15 @@ class MYMODEL(nn.Module):
         super(MYMODEL, self).__init__()
         self.device = device
 
+        self.feature_dim = feature_dim
+
         self.time_step = time_step
         self.future_step = future_step
         self.total_step = time_step + future_step
-        self.writer = writer
 
-        self.feature_dim = feature_dim
-
-        self.encoder = ViT(image_size=128,
-                        patch_size=16,
-                        num_classes=0,
-                        dim=512,
-                        depth=8,
-                        heads=8,
-                        mlp_dim=feature_dim).to(device)
-        
-        self.encoder_wrist = ViT(image_size=128,
-                                patch_size=16,
-                                num_classes=0,
-                                dim=512,
-                                depth=8,
-                                heads=8,
-                                mlp_dim=feature_dim).to(device)
-        
-        self.encoder_state = nn.Sequential(
+        self.encoder = ResnetEncoder(input_shape=obs_shape, output_size=feature_dim).to(device)
+        self.wrist_encoder = ResnetEncoder(input_shape=obs_shape, output_size=feature_dim).to(device)
+        self.state_encoder = nn.Sequential(
             nn.Linear(9, hidden_dim),
             nn.GELU(),
             nn.Linear(hidden_dim, hidden_dim),
@@ -143,48 +126,34 @@ class MYMODEL(nn.Module):
             nn.Linear(hidden_dim, feature_dim)
         )
 
-        self.seer_module = SEER_ENCODER_STATE(feature_dim=feature_dim, 
-                                            task_embed_dim=task_embed_dim, 
-                                            total_step=time_step,
-                                            future_step=future_step, 
-                                            attn_depth=8, 
-                                            hidden_dim=hidden_dim, 
-                                            output_dim=output_dim, 
-                                            device=device).to(device)
-        self.predictor_agent = nn.Sequential(
-            nn.Linear(output_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, feature_dim)
-        )
-        self.predictor_wrist = nn.Sequential(
-            nn.Linear(output_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, feature_dim)
-        )
-        self.predictor_state = nn.Sequential(
-            nn.Linear(output_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, feature_dim)
-        )
+
+        self.idm = IDM_SEER_STATE(feature_dim=feature_dim, 
+                                  task_embed_dim=task_embed_dim, 
+                                  total_step=self.total_step, 
+                                  attn_depth=8,
+                                  hidden_dim=hidden_dim, 
+                                  output_dim=output_dim, 
+                                  device=device).to(device)
+        
+        self.fdm = FDM_SEER_STATE(feature_dim=feature_dim, 
+                                  task_embed_dim=task_embed_dim, 
+                                  total_step=self.time_step, 
+                                  multi_modality=3, 
+                                  future_step=self.future_step,
+                                  attn_depth=8,
+                                  hidden_dim=hidden_dim, 
+                                  output_dim=output_dim,
+                                  device=device).to(device)
+        
         self.a_quantizer = VectorQuantizer(n_code, feature_dim, device=device)
 
-        # self.decoder = DECODER_L(feature_dim=feature_dim, hidden_dim=hidden_dim, output_dim=hidden_dim).to(device)
+
+        # self.hl_policy = HL_PRED_MMS(feature_dim=feature_dim, task_embed_dim=task_embed_dim, hidden_dim=[hidden_dim*2, hidden_dim*2, hidden_dim, hidden_dim], output_dim=output_dim).to(device)
+
+        # self.decoder = DECODER_L_MM(feature_dim=feature_dim, hidden_dim=hidden_dim, multi_modality=3, output_dim=output_dim).to(device)
+        self.decoder_head = GMMHead(hidden_dim, action_dim-1, hidden_dim, loss_coef=0.01)
 
         self.decoder = DECODER_MM(feature_dim=feature_dim, hidden_dim=hidden_dim, multi_modality=3, output_dim=hidden_dim).to(device)
-
-        self.decoder_head = GMMHead(hidden_dim, action_dim-1, hidden_dim, loss_coef=0.01)
 
     def update_stage1(self, obs_history, next_obs, optim, ground_truth_action, cur_step=0):
         '''
@@ -200,7 +169,7 @@ class MYMODEL(nn.Module):
 
         obs_full_history = torch.concat((obs_agent_history, next_obs_agent), dim=1)
         obs_full_history_wrist = torch.concat((obs_wrist_history, next_obs_wrist), dim=1)
-        state_full_history = torch.concat((state_history, next_state), dim=1)
+        obs_full_history_state = torch.concat((state_history, next_state), dim=1)
         batch_size, time_step, num_channel, img_size = obs_agent_history.shape[0], obs_agent_history.shape[1], obs_agent_history.shape[2], obs_agent_history.shape[3]
         next_time_step = next_obs_agent.shape[1]
 
@@ -208,34 +177,35 @@ class MYMODEL(nn.Module):
 
         # print(idm_obs_agent.shape)
         # print(obs_wrist_history.shape)
-        # print(state_history.shape)
+        # print(task_embedding_history.shape)
 
         obs_full_history = obs_full_history.reshape(-1, num_channel, img_size, img_size).float()
         obs_embed = self.encoder.forward(obs_full_history)
         obs_embed = obs_embed.reshape(batch_size, time_step+next_time_step, -1)
-
+        
         obs_full_history_wrist = obs_full_history_wrist.reshape(-1, num_channel, img_size, img_size).float()
-        obs_embed_wrist = self.encoder_wrist.forward(obs_full_history_wrist)
+        obs_embed_wrist = self.wrist_encoder.forward(obs_full_history_wrist)
         obs_embed_wrist = obs_embed_wrist.reshape(batch_size, time_step+next_time_step, -1)
         
-        state_full_history = state_full_history.float()
-        obs_embed_state = self.encoder_state.forward(state_full_history)
+        obs_embed_state = self.state_encoder.forward(obs_full_history_state.float())
+        obs_embed_state = obs_embed_state.reshape(batch_size, time_step+next_time_step, -1)
 
-        seer_input_agent = obs_embed[:, :-next_time_step]
-        seer_input_wrist = obs_embed_wrist[:, :-next_time_step]
-        seer_input_state = obs_embed_state[:, :-next_time_step]
-
-        action_z, pred_agent, pred_wrist, pred_state = self.seer_module.forward(seer_input_agent, seer_input_wrist, seer_input_state, task_embedding_history[:, 0].unsqueeze(-2).float())
-        pred_agent = self.predictor_agent(pred_agent)
-        pred_wrist = self.predictor_wrist(pred_wrist)
-        pred_state = self.predictor_state(pred_state)
-
+        fdm_embed = obs_embed[:, :-next_time_step]
         ans = obs_embed[:, time_step:]
+        fdm_embed_wrist = obs_embed_wrist[:, :-next_time_step]
         ans_wrist = obs_embed_wrist[:, time_step:]
+        fdm_embed_state = obs_embed_state[:, :-next_time_step]
         ans_state = obs_embed_state[:, time_step:]
 
-        decoder_input = action_z
-        joint_action, eef_action = self.decoder(decoder_input)
+        z = self.idm.forward(obs_embed, obs_embed_wrist, obs_embed_state, task_embedding_history[:, 0].float().unsqueeze(-2))
+        q_loss, z_q, _, _, _ = self.a_quantizer.forward(z)
+
+        fdm_agent, fdm_wrist, fdm_state = self.fdm.forward(fdm_embed, fdm_embed_wrist, fdm_embed_state, task_embedding_history[:, 0].float().unsqueeze(-2), z_q.unsqueeze(-2))
+        fdm_agent = fdm_agent.reshape(batch_size, next_time_step, -1)
+        fdm_wrist = fdm_wrist.reshape(batch_size, next_time_step, -1)
+        fdm_state = fdm_state.reshape(batch_size, next_time_step, -1)
+
+        joint_action, eef_action = self.decoder(z_q)
         joint_action = self.decoder_head(joint_action)
         eef_action = eef_action.squeeze(dim=-1)
 
@@ -244,16 +214,16 @@ class MYMODEL(nn.Module):
 
         joint_loss = self.decoder_head.loss_fn(joint_action, gt_joint, reduction='none')
         eef_loss = F.binary_cross_entropy(eef_action, gt_eef)
+        action_loss = torch.mean(joint_loss) + eef_loss
 
-        loss = torch.mean(joint_loss) + eef_loss + F.mse_loss(pred_agent, ans) + F.mse_loss(pred_wrist, ans_wrist) + F.mse_loss(pred_state, ans_state)
+        loss = action_loss + F.mse_loss(fdm_agent, ans) + F.mse_loss(fdm_wrist, ans_wrist) + F.mse_loss(fdm_state, ans_state) + q_loss
 
         optim.zero_grad()
         loss.backward()
         optim.step()
 
         return loss.item()
-
-
+    
     def update(self, next_data, optim, stage=1, cur_step=0):
         
         obs_history, action, action_seq, next_obs = next_data
@@ -267,8 +237,6 @@ class MYMODEL(nn.Module):
 
         if stage == 1:
             return self.update_stage1(obs_history, next_obs, optim, action, cur_step=cur_step)
-        else:
-            raise NotImplementedError
 
 
 if __name__ == "__main__":
@@ -281,7 +249,6 @@ if __name__ == "__main__":
     cudnn.benchmark = False
     cudnn.deterministic = True
     random.seed(SEED)
-
 
     DATA_STORAGE_DIR = "/home/dls0901/data_libero_goal"
     TASK_DATA_DIR_SUFFIX = "_framestack1"
@@ -390,7 +357,9 @@ if __name__ == "__main__":
                         min_frequency=5, max_token_length=20)
         replay_dataset = iter(replay_loader)
         
-        print(m.update(next(replay_dataset), optim, stage=1))
+        m.update(next(replay_dataset), optim, stage=1)
+        m.update(next(replay_dataset), optim, stage=2)
+        m.update(next(replay_dataset), optim, stage=3)
 
 
         # writer.close()

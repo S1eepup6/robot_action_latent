@@ -29,7 +29,7 @@ from models.hl_policy import *
 from models.decoder import *
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:0'
+DEVICE = 'cuda:1'
 
 TRAIN = True
 SEED = 0
