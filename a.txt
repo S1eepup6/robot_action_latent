@@ -15,7 +15,7 @@ tensorboard --logdir=runs
 tmux new -s 
 
 git add .
-git commit -m "Commit Time 0908"
+git commit -m "Commit Time 0911"
 git push
 
 --------------------------------------------------

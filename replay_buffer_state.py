@@ -185,4 +185,4 @@ def make_replay_loader_dist(replay_dir, max_traj_per_task, max_size, batch_size,
                                          num_workers=num_workers,
                                          pin_memory=False,
                                          worker_init_fn=_worker_init_fn)
-    return loader
+    return loader, len(iterable)
