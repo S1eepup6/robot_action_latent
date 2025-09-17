@@ -15,7 +15,7 @@ tensorboard --logdir=runs
 tmux new -s 
 
 git add .
-git commit -m "Commit Time 0911"
+git commit -m "Commit Time 0914"
 git push
 
 --------------------------------------------------
@@ -23,24 +23,13 @@ git push
 
 python model_seer_mms_ori2.py && python eval_goal_each_cuda0_seer_mms_ori2.py && python model_seer_mms_ori2_ones.py && python eval_goal_each_cuda0_seer_mms_ori2_ones.py
 
-python model_seer_mms_ori.py && python eval_goal_each_cuda1_seer_mms_ori.py && python model_seer_mms_ori_ones.py && python eval_goal_each_cuda1_seer_mms_ori_ones.py
+python sbm_1.py && python eval_seer_sbm1.py
 
 python model_seer_mms_ori3.py && python eval_goal_each_cuda2_seer_mms_ori3.py && python model_seer_mms_ori3_ones.py && python eval_goal_each_cuda2_seer_mms_ori3_ones.py
-
+python sbm_2.py && python eval_seer_sbm2.py
 
 --------------------------------------------------
 
-python model_mms_all.py && python eval_goal_each_cuda0_mms_all.py && 
-python model_mms.py && python eval_goal_each_cuda0_mms.py && 
-python model_mms_90g.py && python eval_goal_each_cuda0_mms_90g.py
-
-python model_hotl_seer_mms_all.py && python eval_goal_each_cuda1_hotl_seer_mms_all.py && 
-python model_hotl_seer_mms.py && python eval_goal_each_cuda1_hotl_seer_mms.py && 
-python model_hotl_seer_mms_90g.py && python eval_goal_each_cuda1_hotl_seer_mms_90g.py
-
-python model_seer_mms_all.py && python eval_goal_each_cuda2_seer_mms_all.py && 
-python model_seer_mms.py && python eval_goal_each_cuda2_seer_mms.py && 
-python model_seer_mms_90g.py && python eval_goal_each_cuda2_seer_mms_90g.py
 
 --------------------------------------------------
 

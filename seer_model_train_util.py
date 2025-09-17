@@ -182,7 +182,7 @@ def train_one_epoch_libero(
         
         loss_calvin = 1. * loss_arm_action + 0.01 * loss_gripper_action + 0.1 * loss_image
 
-        # gradient_accumulation_steps      
+        # gradient_accumulation_steps
         gradient_accumulation_steps = 1  
         loss = loss_calvin / gradient_accumulation_steps
         loss_arm_action = loss_arm_action / gradient_accumulation_steps

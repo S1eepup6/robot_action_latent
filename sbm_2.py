@@ -40,14 +40,14 @@ from models.vit import ViT
 from seer_models.vit_mae import MaskedAutoencoderViT
 from seer_models.perceiver_resampler import PerceiverResampler
 from seer_models.gpt2 import GPT2Model
-from seer_models.seer_model import SeerAgent
+from seer_models.seer_model_revise import SeerAgent
 
 from seer_model_train_util import train_one_epoch_libero
 from utils.seer_dataset import get_liberogoal_dataset
 import clip
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:1'
+DEVICE = 'cuda:2'
 
 TRAIN = True
 SEED = 0
@@ -62,8 +62,8 @@ N_EPOCH = 20
 
 
 now = dt.datetime.now().strftime("%m-%d_%H:%M")
-s1_pt_name = "/data/libero/exp_results/sbm1.pt".format(now, SEED)
-s2_pt_prefix = "/data/libero/exp_each/sbm2"
+s1_pt_name = "/data/libero/exp_results/sbm2_1.pt".format(now, SEED)
+s2_pt_prefix = "/data/libero/exp_each/sbm2_2"
 #################### ARGUMENTS #####################
     
 def construct_task_data_path(root_dir, task_name, task_data_dir_suffix='framestack1'):
@@ -170,6 +170,7 @@ class MYMODEL(nn.Module):
             )
             torch.save(self.state_dict(), s1_pt_name)
 
+
     def update(self, libero_loader, num_epochs, stage=1):
         if stage == 1:
             return self.update_stage1(libero_loader, num_epochs)
@@ -238,7 +239,7 @@ if __name__ == "__main__":
         #     m.update(libero_dataset, N_EPOCH // 2, stage=1)
         #     torch.save(m.state_dict(), s2_pt_name)
 
-        # writer.close()
+        # # writer.close()
 
 ############################### Code Test ###############################
     else:
