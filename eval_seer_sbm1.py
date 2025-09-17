@@ -284,7 +284,7 @@ def print_and_save(result_list, task_suite):
         this_result_list = result_list[j * num_eval_episodes: (j + 1) * num_eval_episodes]
         print("this_result_list :", this_result_list)
         this_result_list = np.array(this_result_list)
-        avg_success = np.mean(this_result_list, axis=0)[0]
+        avg_success = np.mean(this_result_list, axis=0)
         task = task_suite.get_task(j)
         task_name = task.name
         print(f"Success rates for task {j} {task_name}:")
@@ -307,7 +307,7 @@ def eval_one_epoch_libero_ddp(args, model, image_processor, tokenizer):
     evaluate_policy_ddp(args, wrapped_model)
 
 if __name__ == "__main__":
-    m = MYMODEL().to(DEVICE)    
+    m = MYMODEL(device=DEVICE).to(DEVICE)
     s1_pt_name = "/data/libero/exp_results/sbm1.pt"
 
     m.load_state_dict(torch.load(s1_pt_name))

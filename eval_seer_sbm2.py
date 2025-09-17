@@ -48,7 +48,7 @@ benchmark_map = {
 
 from sbm_2 import MYMODEL
 
-DEVICE = "cuda:2"
+DEVICE = "cuda:0"
 RESULT_FILE_NAME = "performance_sbm2.pkl"
 s1_pt_name = "/data/libero/exp_results/sbm2_1.pt"
 
@@ -222,7 +222,7 @@ def evaluate_policy_ddp(args, model):
     task_suite = benchmark_dict[args.finetune_type]()
     device_num = 1
     device_id = 0
-    results = []
+    results = [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     global num_eval_episodes 
     global task_num
@@ -235,8 +235,10 @@ def evaluate_policy_ddp(args, model):
     assert NUM_SEQUENCES % device_num == 0
     interval_len = int(NUM_SEQUENCES // device_num)
     eval_sequences = eval_sequences[device_id*interval_len:min((device_id+1)*interval_len, NUM_SEQUENCES)]
+    eval_sequences = eval_sequences[len(results):]
     # eval_sequences = eval_sequences[len(results):]
     eval_sequences = tqdm(eval_sequences)
+
 
     for eval_id in eval_sequences:
         task_id = eval_id // num_eval_episodes
@@ -284,7 +286,7 @@ def print_and_save(result_list, task_suite):
         this_result_list = result_list[j * num_eval_episodes: (j + 1) * num_eval_episodes]
         print("this_result_list :", this_result_list)
         this_result_list = np.array(this_result_list)
-        avg_success = np.mean(this_result_list, axis=0)[0]
+        avg_success = np.mean(this_result_list, axis=0)
         task = task_suite.get_task(j)
         task_name = task.name
         print(f"Success rates for task {j} {task_name}:")
@@ -307,7 +309,7 @@ def eval_one_epoch_libero_ddp(args, model, image_processor, tokenizer):
     evaluate_policy_ddp(args, wrapped_model)
 
 if __name__ == "__main__":
-    m = MYMODEL().to(DEVICE)    
+    m = MYMODEL(device=DEVICE).to(DEVICE)    
 
     m.load_state_dict(torch.load(s1_pt_name))
     seer_model = m.seer_model
