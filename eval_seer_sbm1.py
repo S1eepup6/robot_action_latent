@@ -28,6 +28,7 @@ from libero.libero.envs import OffScreenRenderEnv
 from PIL import Image
 from pdb import set_trace 
 import clip
+import pickle
 
 def quaternion_to_euler(q):
     rot = R.from_quat(q)
@@ -43,9 +44,17 @@ benchmark_map = {
     "libero_goal": "LIBERO_GOAL",
 }
 
+########################################################################################
+
 from sbm_1 import MYMODEL
 
 DEVICE = "cuda:1"
+RESULT_FILE_NAME = "performance_sbm1.pkl"
+s1_pt_name = "/data/libero/exp_results/sbm1.pt"
+
+SEED = 42
+
+########################################################################################
 
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
@@ -263,6 +272,8 @@ def evaluate_policy_ddp(args, model):
 
         result = evaluate_libero_task(task, env, obs, args, model)
         results.append(result) 
+        with open(RESULT_FILE_NAME, 'wb') as f:
+            pickle.dump(results, f)
         print("results :", results)
     
 

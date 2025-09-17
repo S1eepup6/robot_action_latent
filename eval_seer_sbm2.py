@@ -28,6 +28,7 @@ from libero.libero.envs import OffScreenRenderEnv
 from PIL import Image
 from pdb import set_trace 
 import clip
+import pickle
 
 def quaternion_to_euler(q):
     rot = R.from_quat(q)
@@ -43,9 +44,17 @@ benchmark_map = {
     "libero_goal": "LIBERO_GOAL",
 }
 
+########################################################################################
+
 from sbm_2 import MYMODEL
 
 DEVICE = "cuda:2"
+RESULT_FILE_NAME = "performance_sbm2.pkl"
+s1_pt_name = "/data/libero/exp_results/sbm2_1.pt"
+
+SEED = 42
+
+########################################################################################
 
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
@@ -263,6 +272,8 @@ def evaluate_policy_ddp(args, model):
 
         result = evaluate_libero_task(task, env, obs, args, model)
         results.append(result) 
+        with open(RESULT_FILE_NAME, 'wb') as f:
+            pickle.dump(results, f)
         print("results :", results)
     
 
@@ -297,7 +308,6 @@ def eval_one_epoch_libero_ddp(args, model, image_processor, tokenizer):
 
 if __name__ == "__main__":
     m = MYMODEL().to(DEVICE)    
-    s1_pt_name = "/data/libero/exp_results/sbm1.pt"
 
     m.load_state_dict(torch.load(s1_pt_name))
     seer_model = m.seer_model
@@ -306,7 +316,7 @@ if __name__ == "__main__":
     args = dotdict()
     args["finetune_type"] = "libero_goal"
     args["libero_path"] = "/data/libero/LIBERO"
-    args["seed"] = 42
+    args["seed"] = SEED
     args["sequence_length"] = m.time_step
     args["libero_img_size"] = 128
     args["eval_libero_ensembling"] = True
