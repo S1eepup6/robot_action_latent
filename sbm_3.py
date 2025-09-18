@@ -128,7 +128,7 @@ class MYMODEL(nn.Module):
             attn_robot_proprio_state=False,
             atten_goal=2,
             atten_goal_state=True,
-            mask_l_obs_ratio=0.5,
+            mask_l_obs_ratio=0,
             transformer_layers=8,
             hidden_dim=hidden_dim,
             transformer_heads=8,

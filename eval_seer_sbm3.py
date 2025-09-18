@@ -222,7 +222,8 @@ def evaluate_policy_ddp(args, model):
     task_suite = benchmark_dict[args.finetune_type]()
     device_num = 1
     device_id = 0
-    results = [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
+    results = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]
 
     global num_eval_episodes 
     global task_num
@@ -236,7 +237,6 @@ def evaluate_policy_ddp(args, model):
     interval_len = int(NUM_SEQUENCES // device_num)
     eval_sequences = eval_sequences[device_id*interval_len:min((device_id+1)*interval_len, NUM_SEQUENCES)]
     eval_sequences = eval_sequences[len(results):]
-    # eval_sequences = eval_sequences[len(results):]
     eval_sequences = tqdm(eval_sequences)
 
 
