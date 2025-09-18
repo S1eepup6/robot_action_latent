@@ -46,11 +46,11 @@ benchmark_map = {
 
 ########################################################################################
 
-from sbm_2 import MYMODEL
+from sbm_3 import MYMODEL
 
-DEVICE = "cuda:0"
-RESULT_FILE_NAME = "performance_sbm2.pkl"
-s1_pt_name = "/data/libero/exp_results/sbm2_1.pt"
+DEVICE = "cuda:2"
+RESULT_FILE_NAME = "performance_sbm3.pkl"
+s1_pt_name = "/data/libero/exp_results/sbm3_1.pt"
 
 SEED = 42
 

@@ -40,14 +40,14 @@ from models.vit import ViT
 from seer_models.vit_mae import MaskedAutoencoderViT
 from seer_models.perceiver_resampler import PerceiverResampler
 from seer_models.gpt2 import GPT2Model
-from seer_models.seer_model import SeerAgent
+from seer_models.seer_model_revise2 import SeerAgent
 
 from seer_model_train_util import train_one_epoch_libero
 from utils.seer_dataset import get_liberogoal_dataset
 import clip
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:1'
+DEVICE = 'cuda:0'
 
 TRAIN = True
 SEED = 0
@@ -58,13 +58,13 @@ N_HISTORY = 8
 N_FUTURE_STEP = 2
 
 BATCH_SIZE = 32
-N_EPOCH = 10
-N_EPOCH_2 = 15
+N_EPOCH = 15
+N_EPOCH_2 = 5
 
 
 now = dt.datetime.now().strftime("%m-%d_%H:%M")
-s1_pt_name = "/data/libero/exp_results/sbm_al.pt".format(now, SEED)
-s2_pt_prefix = "/data/libero/exp_each/sbm_al2"
+s1_pt_name = "/data/libero/exp_results/sbm3_al.pt".format(now, SEED)
+s2_pt_prefix = "/data/libero/exp_each/sbm3_al2"
 #################### ARGUMENTS #####################
     
 def construct_task_data_path(root_dir, task_name, task_data_dir_suffix='framestack1'):

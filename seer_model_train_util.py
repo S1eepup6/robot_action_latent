@@ -63,7 +63,8 @@ def train_one_epoch_libero(
     libero_loader,
     optimizer,
     lr_scheduler,
-    device_id
+    device_id,
+    use_action = True
 ):
     num_batches_per_epoch_calvin = num_batches
     num_batches_per_epoch = num_batches_per_epoch_calvin
@@ -146,12 +147,13 @@ def train_one_epoch_libero(
         #     loss_arm_action = torch.tensor([0.0]).to(device_id)
         #     loss_gripper_action = torch.tensor([0.0]).to(device_id)
 
-        loss_arm_action = torch.nn.functional.smooth_l1_loss(
-                        arm_pred_action[:, :sequence_length-atten_goal], 
-                        label_actions[:, :sequence_length-atten_goal, :, :6].detach())
-        loss_gripper_action = torch.nn.functional.binary_cross_entropy(
-                        gripper_pred_action[:, :sequence_length-atten_goal], 
-                        label_actions[:, :sequence_length-atten_goal, :, 6:].detach())
+        if use_action:
+            loss_arm_action = torch.nn.functional.smooth_l1_loss(
+                            arm_pred_action[:, :sequence_length-atten_goal], 
+                            label_actions[:, :sequence_length-atten_goal, :, :6].detach())
+            loss_gripper_action = torch.nn.functional.binary_cross_entropy(
+                            gripper_pred_action[:, :sequence_length-atten_goal], 
+                            label_actions[:, :sequence_length-atten_goal, :, 6:].detach())
 
 
         # loss_image 
@@ -180,13 +182,18 @@ def train_one_epoch_libero(
                         image_pred[:, 1, :, :], 
                         label_image_wrist.detach()))
         
-        loss_calvin = 1. * loss_arm_action + 0.01 * loss_gripper_action + 0.1 * loss_image
+        if use_action:
+            loss_calvin = 1. * loss_arm_action + 0.01 * loss_gripper_action + 0.1 * loss_image
+        else:
+            loss_calvin = 0.1 * loss_image
+
 
         # gradient_accumulation_steps
         gradient_accumulation_steps = 1  
         loss = loss_calvin / gradient_accumulation_steps
-        loss_arm_action = loss_arm_action / gradient_accumulation_steps
-        loss_gripper_action = loss_gripper_action / gradient_accumulation_steps
+        if use_action:
+            loss_arm_action = loss_arm_action / gradient_accumulation_steps
+            loss_gripper_action = loss_gripper_action / gradient_accumulation_steps
         loss_image = loss_image / gradient_accumulation_steps
         mv_avg_loss.append(loss.item())
 
@@ -242,7 +249,10 @@ def train_one_epoch_libero(
             #     )
 
         avg_horizon = min(100, len(mv_avg_loss))
-        t.set_postfix({"avg loss": sum(mv_avg_loss[-avg_horizon:]) / avg_horizon, "loss": loss_calvin.item(), "loss_image": loss_image.item(), "loss_arm_action": loss_arm_action.item(), "loss_gripper_action": loss_gripper_action.item()})
+        if use_action:
+            t.set_postfix({"avg loss": sum(mv_avg_loss[-avg_horizon:]) / avg_horizon, "loss": loss_calvin.item(), "loss_image": loss_image.item(), "loss_arm_action": loss_arm_action.item(), "loss_gripper_action": loss_gripper_action.item()})
+        else:
+            t.set_postfix({"avg loss": sum(mv_avg_loss[-avg_horizon:]) / avg_horizon, "loss": loss_calvin.item(), "loss_image": loss_image.item()})
 
 
 def get_checkpoint(model):
