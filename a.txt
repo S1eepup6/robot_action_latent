@@ -21,11 +21,10 @@ git push
 --------------------------------------------------
 
 
-python model_seer_mms_ori2.py && python eval_goal_each_cuda0_seer_mms_ori2.py && python model_seer_mms_ori2_ones.py && python eval_goal_each_cuda0_seer_mms_ori2_ones.py
+python sbm3_al.py
 
-python sbm_1.py && python eval_seer_sbm1.py
+python sbm_al.py
 
-python model_seer_mms_ori3.py && python eval_goal_each_cuda2_seer_mms_ori3.py && python model_seer_mms_ori3_ones.py && python eval_goal_each_cuda2_seer_mms_ori3_ones.py
 python eval_seer_sbm3.py && python sbm2_al.py
 
 --------------------------------------------------

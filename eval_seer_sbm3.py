@@ -48,9 +48,9 @@ benchmark_map = {
 
 from sbm_3 import MYMODEL
 
-DEVICE = "cuda:2"
-RESULT_FILE_NAME = "performance_sbm3.pkl"
-s1_pt_name = "/data/libero/exp_results/sbm3_1.pt"
+DEVICE = "cuda:0"
+RESULT_FILE_NAME = "performance_sbm_r2.pkl"
+s1_pt_name = "/data/libero/exp_results/sbm_r2_1.pt"
 
 SEED = 42
 
@@ -223,7 +223,7 @@ def evaluate_policy_ddp(args, model):
     device_num = 1
     device_id = 0
 
-    results = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]
+    results = []
 
     global num_eval_episodes 
     global task_num

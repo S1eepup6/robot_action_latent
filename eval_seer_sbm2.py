@@ -46,11 +46,11 @@ benchmark_map = {
 
 ########################################################################################
 
-from sbm_al import MYMODEL
+from sbm2_al import MYMODEL
 
-DEVICE = "cuda:1"
-RESULT_FILE_NAME = "performance_sbm1al.pkl"
-s1_pt_name = "/data/libero/exp_results/sbm_al2.pt"
+DEVICE = "cuda:0"
+RESULT_FILE_NAME = "performance_sbm2_al.pkl"
+s1_pt_name = "/data/libero/exp_each/sbm2_al2.pt"
 
 SEED = 42
 
@@ -222,10 +222,11 @@ def evaluate_policy_ddp(args, model):
     task_suite = benchmark_dict[args.finetune_type]()
     device_num = 1
     device_id = 0
+
     results = []
 
     global num_eval_episodes 
-    global task_num
+    global task_num1
 
     num_eval_episodes = 20
     task_num = 10
@@ -235,8 +236,9 @@ def evaluate_policy_ddp(args, model):
     assert NUM_SEQUENCES % device_num == 0
     interval_len = int(NUM_SEQUENCES // device_num)
     eval_sequences = eval_sequences[device_id*interval_len:min((device_id+1)*interval_len, NUM_SEQUENCES)]
-    # eval_sequences = eval_sequences[len(results):]
+    eval_sequences = eval_sequences[len(results):]
     eval_sequences = tqdm(eval_sequences)
+
 
     for eval_id in eval_sequences:
         task_id = eval_id // num_eval_episodes
@@ -307,8 +309,7 @@ def eval_one_epoch_libero_ddp(args, model, image_processor, tokenizer):
     evaluate_policy_ddp(args, wrapped_model)
 
 if __name__ == "__main__":
-    m = MYMODEL(device=DEVICE).to(DEVICE)
-    s1_pt_name = "/data/libero/exp_results/sbm1.pt"
+    m = MYMODEL(device=DEVICE).to(DEVICE)    
 
     m.load_state_dict(torch.load(s1_pt_name))
     seer_model = m.seer_model
@@ -317,7 +318,7 @@ if __name__ == "__main__":
     args = dotdict()
     args["finetune_type"] = "libero_goal"
     args["libero_path"] = "/data/libero/LIBERO"
-    args["seed"] = 42
+    args["seed"] = SEED
     args["sequence_length"] = m.time_step
     args["libero_img_size"] = 128
     args["eval_libero_ensembling"] = True

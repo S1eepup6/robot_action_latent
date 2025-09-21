@@ -40,23 +40,24 @@ def generate_attention_mask(K, num_A, num_B, atten_goal, atten_goal_state,
         
         # if obs_token exists, action_pred_token should attend to it
         if num_obs_token > 0 and action_pred_steps:
-            attention_mask[start_index+num_A+action_pred_steps:start_index+num_A+action_pred_steps+num_obs_token, start_index+num_A:start_index+num_A+action_pred_steps] = 0.0 
+            attention_mask[start_index+num_A+num_obs_token:start_index+num_A+num_obs_token+action_pred_steps, start_index+num_A:start_index+num_A+num_obs_token] = 0.0 
+            attention_mask[start_index+num_A:start_index+num_A+num_obs_token, start_index+num_A+num_obs_token:start_index+num_A+num_obs_token+action_pred_steps] = 0.0 
         if num_obs_token > 0 and atten_only_obs and action_pred_steps:
-            attention_mask[start_index+num_A:start_index+num_A+action_pred_steps] = -float('inf')
-            attention_mask[start_index+num_A:start_index+num_A+action_pred_steps, start_index+2:start_index+num_A] = 0.0
-            attention_mask[start_index+num_A:start_index+num_A+action_pred_steps, start_index+num_A:start_index+num_A+action_pred_steps] = 0.0 
+            attention_mask[start_index+num_A+num_obs_token:start_index+num_A+num_obs_token+action_pred_steps] = -float('inf')
+            attention_mask[start_index+num_A+num_obs_token:start_index+num_A+num_obs_token+action_pred_steps, start_index+2:start_index+num_A] = 0.0
+            attention_mask[start_index+num_A+num_obs_token:start_index+num_A+num_obs_token+action_pred_steps, start_index+num_A:start_index+num_A+num_obs_token] = 0.0 
             if attn_robot_proprio_state:
-                attention_mask[start_index+num_A:start_index+num_A+action_pred_steps, start_index+1:start_index+2] = 0.0
+                attention_mask[start_index+num_A+num_obs_token:start_index+num_A+num_obs_token+action_pred_steps, start_index+1:start_index+2] = 0.0
             if mask_l_obs_ratio > 0:
                 count = int(mask_l_obs_ratio * (num_obs_token))
                 selected_numbers = np.random.choice(range(num_obs_token), size=count, replace=False)
                 for num in selected_numbers:
-                    attention_mask[start_index+num_A:start_index+num_A+action_pred_steps, start_index+num_A+num] = -float('inf')
+                    attention_mask[start_index+num_A+num_obs_token:start_index+num_A+num_obs_token+action_pred_steps, start_index+num_A+num] = -float('inf')
         if num_obs_token > 0 and atten_goal:
             if i < K - atten_goal:
                 pred_end_index = (i + atten_goal) * (num_A + num_B)
                 if atten_goal_state:
-                    attention_mask[start_index+num_A+action_pred_steps:start_index+num_A+action_pred_steps+num_obs_token,pred_end_index+1:pred_end_index+2] = 0.0
+                    attention_mask[start_index+num_A:start_index+num_A+num_obs_token,pred_end_index+1:pred_end_index+2] = 0.0
 
     return attention_mask
 
@@ -386,10 +387,10 @@ class SeerAgent(nn.Module):
         embeddings = torch.cat((text_embedding, state_embedding, image_embedding, image_cls_token_embedding), dim=2)
         pred_token_start_idx = embeddings.shape[2]
         transformer_input_list = [embeddings]
-        if self.action_pred_steps > 0:
-            transformer_input_list.append(self.action_pred_token.repeat(B, S, 1, 1))
         if self.obs_pred:
             transformer_input_list.append(self.obs_tokens.repeat(B, S, 1, 1))
+        if self.action_pred_steps > 0:
+            transformer_input_list.append(self.action_pred_token.repeat(B, S, 1, 1))
         transformer_input = torch.cat(transformer_input_list, dim=2)  
         transformer_input = transformer_input + self.transformer_backbone_position_embedding.repeat(B, 1, transformer_input.shape[-2], 1)
         transformer_input = transformer_input.flatten(1, 2)
@@ -400,19 +401,9 @@ class SeerAgent(nn.Module):
         transformer_input = self.embedding_layer_norm(transformer_input)
         transformer_output = self.transformer_backbone(inputs_embeds=transformer_input, attention_mask=self.attention_mask)
         transformer_output = transformer_output.view(B, S, -1, self.hidden_dim)
-        
-        if self.action_pred_steps > 0:
-            if self.obs_pred:
-                this_num_obs_token = self.NUM_OBS_TOKEN
-            else:
-                this_num_obs_token = 0
-            action_pred_feature = transformer_output[:, :, pred_token_start_idx:pred_token_start_idx+self.action_pred_steps, :]
-            action_pred_feature = self.action_decoder(action_pred_feature)
-            arm_pred_action = self.arm_action_decoder(action_pred_feature)
-            gripper_pred_action = self.gripper_action_decoder(action_pred_feature)
 
         if self.obs_pred:
-            obs_pred_feature = transformer_output[:, :, pred_token_start_idx+self.action_pred_steps : pred_token_start_idx+self.action_pred_steps+self.NUM_OBS_TOKEN, :]
+            obs_pred_feature = transformer_output[:, :, pred_token_start_idx : pred_token_start_idx+self.NUM_OBS_TOKEN, :]
             obs_pred_embedding = self.image_decoder_obs_pred_projector(obs_pred_feature.reshape(-1, self.hidden_dim))
             obs_pred_embedding = obs_pred_embedding.view(B * S * (self.NUM_OBS_TOKEN // self.NUM_OBS_TOKEN_PER_IMAGE), self.NUM_OBS_TOKEN_PER_IMAGE, self.IMAGE_DECODER_hidden_dim)
             mask_tokens = self.mask_token.repeat(B * S * (self.NUM_OBS_TOKEN // self.NUM_OBS_TOKEN_PER_IMAGE), self.NUM_MASK_TOKEN, 1)
@@ -424,5 +415,14 @@ class SeerAgent(nn.Module):
             image_pred = self.image_decoder_pred(image_pred_feature)
             image_pred = image_pred.view(B * S, self.NUM_OBS_TOKEN // self.NUM_OBS_TOKEN_PER_IMAGE, self.NUM_MASK_TOKEN, -1)  
         
+        if self.action_pred_steps > 0:
+            if self.obs_pred:
+                this_num_obs_token = self.NUM_OBS_TOKEN
+            else:
+                this_num_obs_token = 0
+            action_pred_feature = transformer_output[:, :, pred_token_start_idx+this_num_obs_token:pred_token_start_idx+this_num_obs_token+self.action_pred_steps, :]
+            action_pred_feature = self.action_decoder(action_pred_feature)
+            arm_pred_action = self.arm_action_decoder(action_pred_feature)
+            gripper_pred_action = self.gripper_action_decoder(action_pred_feature)
         
         return arm_pred_action, gripper_pred_action, image_pred, arm_pred_state, gripper_pred_state, loss_arm_action

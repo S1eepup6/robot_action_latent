@@ -47,7 +47,7 @@ from utils.seer_dataset import get_liberogoal_dataset
 import clip
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:0'
+DEVICE = 'cuda:1'
 
 TRAIN = True
 SEED = 0
@@ -63,8 +63,8 @@ N_EPOCH_2 = 5
 
 
 now = dt.datetime.now().strftime("%m-%d_%H:%M")
-s1_pt_name = "/data/libero/exp_results/sbm3_al.pt".format(now, SEED)
-s2_pt_prefix = "/data/libero/exp_each/sbm3_al2"
+s1_pt_name = "/data/libero/exp_results/sbm_r2_al.pt".format(now, SEED)
+s2_pt_prefix = "/data/libero/exp_each/sbm_r2_al2"
 #################### ARGUMENTS #####################
     
 def construct_task_data_path(root_dir, task_name, task_data_dir_suffix='framestack1'):
@@ -129,7 +129,7 @@ class MYMODEL(nn.Module):
             attn_robot_proprio_state=False,
             atten_goal=2,
             atten_goal_state=True,
-            mask_l_obs_ratio=0,
+            mask_l_obs_ratio=0.5,
             transformer_layers=8,
             hidden_dim=hidden_dim,
             transformer_heads=8,
