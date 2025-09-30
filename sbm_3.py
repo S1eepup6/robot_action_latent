@@ -58,11 +58,11 @@ N_HISTORY = 8
 N_FUTURE_STEP = 2
 
 BATCH_SIZE = 32
-N_EPOCH = 20
+N_EPOCH = 10
 
 
 now = dt.datetime.now().strftime("%m-%d_%H:%M")
-s1_pt_name = "/data/libero/exp_results/sbm_r2_1.pt".format(now, SEED)
+s1_pt_name = "/data/libero/exp_results/sbm_r2_1.pt"
 s2_pt_prefix = "/data/libero/exp_each/sbm_r2_2"
 #################### ARGUMENTS #####################
     

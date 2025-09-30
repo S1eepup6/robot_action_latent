@@ -21,14 +21,17 @@ git push
 --------------------------------------------------
 
 
+python sbm3.py
+
 python sbm3_al.py
 
-python sbm_al.py
-
-python eval_seer_sbm3.py && python sbm2_al.py
+python sbm_3m.py
 
 --------------------------------------------------
 
+torchrun --nproc_per_node=3 train.py --config-name=train_libero_goal
+
+MUJOCO_GL=egl python3 online_eval.py --config-name=train_libero_goal
 
 --------------------------------------------------
 
@@ -38,3 +41,11 @@ python read_results.py performance_hotl_seer_mms_gall.pkl performance_mms_gall.p
 
 python read_results.py performance_seer_mms_ori.pkl performance_seer_mms_ori2.pkl performance_seer_mms_ori3.pkl
 python read_results.py performance_seer_mms_ori_ones.pkl performance_seer_mms_ori2_ones.pkl performance_seer_mms_ori3_ones.pkl
+
+
+conda create -n quest python=3.10.14
+conda activate quest
+git clone https://github.com/atharvamete/QueST.git
+cd quest
+python -m pip install torch==2.2.0 torchvision==0.17.0
+python -m pip install -e .

@@ -58,11 +58,11 @@ N_HISTORY = 8
 N_FUTURE_STEP = 2
 
 BATCH_SIZE = 32
-N_EPOCH = 20
+N_EPOCH = 60
 
 
 now = dt.datetime.now().strftime("%m-%d_%H:%M")
-s1_pt_name = "/data/libero/exp_results/sbm2_1.pt".format(now, SEED)
+s1_pt_name = "/data/libero/exp_results/sbm2_m.pt".format(now, SEED)
 s2_pt_prefix = "/data/libero/exp_each/sbm2_2"
 #################### ARGUMENTS #####################
     
@@ -129,7 +129,7 @@ class MYMODEL(nn.Module):
             atten_goal=2,
             atten_goal_state=True,
             mask_l_obs_ratio=0.5,
-            transformer_layers=8,
+            transformer_layers=12,
             hidden_dim=hidden_dim,
             transformer_heads=8,
             phase="finetune",
@@ -166,7 +166,8 @@ class MYMODEL(nn.Module):
                 libero_loader=libero_loader,
                 optimizer=optim,
                 lr_scheduler=lr_scheduler,
-                device_id=self.device
+                device_id=self.device,
+                use_action=False
             )
             torch.save(self.state_dict(), s1_pt_name)
 

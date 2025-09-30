@@ -49,8 +49,8 @@ benchmark_map = {
 from sbm_al import MYMODEL
 
 DEVICE = "cuda:1"
-RESULT_FILE_NAME = "performance_sbm1al.pkl"
-s1_pt_name = "/data/libero/exp_results/sbm_al2.pt"
+RESULT_FILE_NAME = "performance_sbm1.pkl"
+s1_pt_name = "/data/libero/exp_results/sbm1.pt"
 
 SEED = 42
 
@@ -308,7 +308,6 @@ def eval_one_epoch_libero_ddp(args, model, image_processor, tokenizer):
 
 if __name__ == "__main__":
     m = MYMODEL(device=DEVICE).to(DEVICE)
-    s1_pt_name = "/data/libero/exp_results/sbm1.pt"
 
     m.load_state_dict(torch.load(s1_pt_name))
     seer_model = m.seer_model
