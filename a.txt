@@ -20,12 +20,7 @@ git push
 
 --------------------------------------------------
 
-
-python sbm3.py
-
-python sbm3_al.py
-
-python sbm_3m.py
+python de.py && python eval_de.py
 
 --------------------------------------------------
 

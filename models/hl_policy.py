@@ -198,8 +198,8 @@ class HL_PRED_AE(nn.Module):
             nn.Linear(action_hidden_dim, output_dim),
         )
 
-    def forward(self, x):
-        z = self.obs_module(x)
+    def forward(self, x, t):
+        z = self.obs_module(torch.concatenate([x, t], dim=-1))
         return self.action_module(z)
 
 

@@ -51,7 +51,7 @@ class LiberoGoalDataset(TrajectoryDataset):
     #              actions.npy
     def __init__(self, 
                  data_directory = "/data/libero/libero_dataset",
-                 subset_fraction: Optional[float] = None):
+                 subset_fraction: Optional[int] = None):
         self.dir = Path(data_directory) / "libero_goal"
         self.task_names = list(self.dir.iterdir())
         self.task_names.sort()
@@ -63,7 +63,7 @@ class LiberoGoalDataset(TrajectoryDataset):
             self.demos += list(task_name.iterdir())
 
         self.subset_fraction = subset_fraction
-        if self.subset_fraction:
+        if self.subset_fraction is not None:
             assert 50 % self.subset_fraction == 0
             # n = int(len(self.demos) * self.subset_fraction)
             self.demos = self.demos[::self.subset_fraction]

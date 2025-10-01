@@ -40,7 +40,7 @@ SEED = 0
 
 STAGE = 5
 
-WINDOW_SIZE = 1
+WINDOW_SIZE = 5
 
 BATCH_SIZE = 32
 N_EPOCH = 50
@@ -97,7 +97,7 @@ class MYMODEL(nn.Module):
                 final_goal = final_goal.to(DEVICE)[0]
 
                 goal = None
-                for o, n in zip(obs, next_obs):
+                for i, (o, n) in enumerate(zip(obs, next_obs)):
                     with torch.no_grad():
                         obs_enc = self.encoder(o)  # (window_size, 2, 512)
 
@@ -110,7 +110,7 @@ class MYMODEL(nn.Module):
                     goal, hl_pred = self.hl_policy.forward_with_pred(policy_obs, final_goal)
 
                     joint_act, gripper_act = self.decoder(obs_enc, goal)
-                    loss = F.mse_loss(joint_act, gt_act[:, :-1]) + F.binary_cross_entropy(gripper_act, gt_act[:, -1]) + 0.2 * (F.mse_loss(hl_pred, policy_target) / WINDOW_SIZE)
+                    loss = F.mse_loss(joint_act, gt_act[i, :-1]) + F.binary_cross_entropy(gripper_act, gt_act[i, -1:]) + 0.2 * (F.mse_loss(hl_pred, policy_target) / WINDOW_SIZE)
 
                     optim.zero_grad()
                     loss.backward()
@@ -142,8 +142,8 @@ if __name__ == "__main__":
         # Model, optimizer set
         m = MYMODEL().to(device=DEVICE)
 
-        # dataset = LiberoGoalDataset(subset_fraction=5)
-        dataset = LiberoGoalDataset()
+        dataset = LiberoGoalDataset(subset_fraction=5)
+        # dataset = LiberoGoalDataset()
         data_loader = DataLoader(dataset, shuffle=True, batch_size=BATCH_SIZE)
         
         kwargs = {
