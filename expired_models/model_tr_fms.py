@@ -22,7 +22,7 @@ from libero.libero import benchmark
 from pathlib import Path
 
 from models.idm import *
-from models.fdm import *
+from robot_action_latent.models.fdm.fdm import *
 from models.hl_policy import *
 from models.decoder import *
 

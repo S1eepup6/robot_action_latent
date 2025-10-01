@@ -22,7 +22,7 @@ from libero.libero import benchmark
 from pathlib import Path
 
 from models.idm import IDM_MASKED_ATTN
-from models.fdm import FDM_MASKED_ATTN
+from robot_action_latent.models.fdm.fdm import FDM_MASKED_ATTN
 from models.hl_policy import *
 from models.decoder import *
 

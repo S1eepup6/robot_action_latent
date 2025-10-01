@@ -31,7 +31,7 @@ from transformers import (
 )
 
 from models.idm import IDM_MASKED_ATTN
-from models.fdm import *
+from robot_action_latent.models.fdm.fdm import *
 from models.hl_policy import *
 # from models.decoder import *
 from models.seer_encoder_mm import *

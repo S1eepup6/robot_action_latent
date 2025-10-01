@@ -40,7 +40,8 @@ SEED = 0
 
 STAGE = 5
 
-N_FUTURE_STEP = 5
+N_HISTORY = 4
+N_FUTURE_STEP = N_HISTORY
 
 BATCH_SIZE = 32
 N_EPOCH = 60
@@ -97,7 +98,7 @@ class MYMODEL(nn.Module):
                 with torch.no_grad():
                     obs_enc = self.encoder(obs.to(DEVICE))
                 # obs_enc.shape == (window_size, 2, 512)
-                
+
                 if goal is None or step % N_FUTURE_STEP == 0:
                     goal = self.hl_policy(obs_enc)
 
@@ -139,7 +140,7 @@ if __name__ == "__main__":
         kwargs = {
             "train_fraction": 0.95,
             "random_seed": SEED,
-            "window_size": 5,
+            "window_size": N_HISTORY,
             "future_conditional": False,
             "min_future_sep": 0,
             "future_seq_len": 0,
