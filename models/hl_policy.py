@@ -203,8 +203,8 @@ class HL_PRED_AE(nn.Module):
         return self.action_module(z)
 
 
-    def forward_with_pred(self, x):
-        z = self.obs_module(x)
+    def forward_with_pred(self, x, t):
+        z = self.obs_module(torch.concatenate([x, t], dim=-1))
 
         return self.action_module(z), self.pred_module(z)
     

@@ -28,12 +28,12 @@ class DECODER(nn.Module):
 class DECODER_L(nn.Module):
     def __init__(self,
                  feature_dim = 128,
-                 hidden_dim = 128,
-                 output_dim = 128):
+                 goal_dim = 128,
+                 hidden_dim = 128,):
         super(DECODER_L, self).__init__()
 
         self.base_module = nn.Sequential(
-            nn.Linear(feature_dim+feature_dim, hidden_dim),
+            nn.Linear(feature_dim+goal_dim, hidden_dim),
             nn.GELU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.GELU(),
@@ -44,14 +44,16 @@ class DECODER_L(nn.Module):
         )
 
         self.joint_actor = nn.Sequential(
-            nn.Linear(hidden_dim, output_dim)
+            nn.Linear(hidden_dim, 6),
+            nn.Tanh()
         )
         self.eef_selector = nn.Sequential(
-            nn.Linear(hidden_dim, 3)
+            nn.Linear(hidden_dim, 1),
+            nn.Sigmoid()
         )
 
-    def forward(self, x):
-        l = self.base_module(x)
+    def forward(self, x, g):
+        l = self.base_module(torch.concatenate([x, g], dim=-1))
         return self.joint_actor(l), self.eef_selector(l)
     
 class DECODER_L_MM(nn.Module):

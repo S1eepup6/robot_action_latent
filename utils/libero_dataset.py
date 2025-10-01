@@ -5,6 +5,36 @@ from pathlib import Path
 from typing import Optional
 from torch.nn.utils.rnn import pad_sequence
 from utils.libero_dataset_core import TrajectoryDataset
+# from libero_dataset_core import TrajectoryDataset
+from transformers import BertTokenizer, BertModel
+import re
+from tqdm import tqdm
+
+### Compute the bert embedding of the task description
+def get_task_embedding(task_name):
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    input_ids = tokenizer.encode(task_name, add_special_tokens=True)
+    input_tensor = torch.tensor([input_ids])
+    model = BertModel.from_pretrained('bert-base-uncased')
+    with torch.no_grad():
+        outputs = model(input_tensor)
+    last_hidden_states = outputs[0]
+    sentence_embedding = last_hidden_states[:, 0, :]
+    return sentence_embedding
+
+def extract_task_information(file_name, libero_path):
+    """
+    Extracts task information from the given file name.
+    """
+    # Regular expression pattern to extract the task name
+    pattern = r'{}/((.+)_(.+))_demo\.hdf5'.format(libero_path)
+
+    # Extracting the task name
+    match = re.search(pattern, file_name)
+    
+    task_embedding = get_task_embedding(match.group(3).lower().replace("_", " "))
+    print(match.group(3).lower().replace("_", " "))
+    return match.group(1).lower() if match else None, task_embedding
 
 
 class LiberoGoalDataset(TrajectoryDataset):
@@ -26,14 +56,17 @@ class LiberoGoalDataset(TrajectoryDataset):
         self.task_names = list(self.dir.iterdir())
         self.task_names.sort()
         self.demos = []
-        for task_name in self.task_names:
+        self.goals = []
+        for task_name in tqdm(self.task_names):
+            task_id = str(task_name).split('/')[-1]
+            self.goals.append(get_task_embedding(task_id.lower().replace("_", " ")))
             self.demos += list(task_name.iterdir())
 
         self.subset_fraction = subset_fraction
         if self.subset_fraction:
-            assert 0 < self.subset_fraction <= 1
-            n = int(len(self.demos) * self.subset_fraction)
-            self.demos = self.demos[:n]
+            assert 50 % self.subset_fraction == 0
+            # n = int(len(self.demos) * self.subset_fraction)
+            self.demos = self.demos[::self.subset_fraction]
 
         # prefetch all npy data
         self.joint_pos = []
@@ -77,12 +110,12 @@ class LiberoGoalDataset(TrajectoryDataset):
         self.actions = pad_sequence(self.actions, batch_first=True).float()
 
         # last frame goal
-        self.goals = None
-        goals = []
-        for i in range(0, 500, 50):
-            last_obs, _, _ = self.get_frames(i, [-1])  # 1 V C H W
-            goals.append(last_obs)
-        self.goals = goals
+        # self.goals = None
+        # goals = []
+        # for i in range(10):
+        #     last_obs, _, _ = self.get_frames(i, [-1])  # 1 V C H W
+        #     goals.append(last_obs)
+        # self.goals = goals
 
     def __len__(self):
         return len(self.demos)
@@ -104,8 +137,8 @@ class LiberoGoalDataset(TrajectoryDataset):
         # print(obs.shape)
 
         if self.goals is not None:
-            task_idx = idx // 50
-            goal = self.goals[task_idx].repeat(len(frames), 1, 1, 1, 1)
+            task_idx = idx // int(50 // self.subset_fraction)
+            goal = self.goals[task_idx]
             return obs, act, goal
         else:
             return obs, act, None
@@ -122,3 +155,24 @@ class LiberoGoalDataset(TrajectoryDataset):
             T = self.get_seq_length(i)
             actions.append(self.actions[i][:T])
         return torch.cat(actions, dim=0)
+
+
+if __name__ == "__main__":
+    
+    from libero_dataset_core import get_train_val_sliced
+    from torch.utils.data import DataLoader
+
+    dataset = LiberoGoalDataset(subset_fraction=5)
+    # dataset = LiberoGoalDataset()
+    data_loader = DataLoader(dataset, shuffle=True, batch_size=64)
+    
+    kwargs = {
+        "train_fraction": 0.999,
+        "random_seed": 42,
+        "window_size": 4+1,
+        "future_conditional": False,
+        "min_future_sep": 0,
+        "future_seq_len": 0,
+        "num_extra_predicted_actions": 0,
+    }
+    train_loader, test_loader = get_train_val_sliced(dataset, **kwargs)
