@@ -29,9 +29,11 @@ python sbm_3m.py
 
 --------------------------------------------------
 
-torchrun --nproc_per_node=3 train.py --config-name=train_libero_goal
+torchrun --nproc_per_node=3 train.py --config-name=train_libero_goal && MUJOCO_GL=egl python3 online_eval.py --config-name=train_libero_goal
 
-MUJOCO_GL=egl python3 online_eval.py --config-name=train_libero_goal
+75
+64
+86
 
 --------------------------------------------------
 
