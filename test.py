@@ -1,46 +1,43 @@
-import warnings
-warnings.filterwarnings('ignore', category=DeprecationWarning)
-
-import os
-os.environ['MKL_SERVICE_FORCE_INTEL'] = '1'
-os.environ['MUJOCO_GL'] = 'egl'
-
 import numpy as np
-import time
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch.distributed import init_process_group, destroy_process_group, gather
+import torchvision.transforms as T
+from utils.quantizer import VectorQuantizer
+import time
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.tensorboard import SummaryWriter
+import random
+import torch.backends.cudnn as cudnn
+
+from utils.resnet18_encoder import ResnetEncoder
+from utils.policy_head import GMMHead
+from utils.data_augmentation import BatchWiseImgColorJitterAug, TranslationAug, DataAugGroup
+import utils.misc as utils
+from tqdm import tqdm
+ 
 from replay_buffer import make_replay_loader_dist
 from libero.libero import benchmark
-from torch.distributed import init_process_group, destroy_process_group, gather
 from pathlib import Path
-from tqdm import tqdm
-import utils.misc as utils
+import datetime as dt
 
-import pickle
-import pprint
-from libero.libero import benchmark
-import numpy as np
+from models.encoder.resnet import *
+from models.hl_policy import *
+from models.decoder import *
 
-torch.backends.cudnn.benchmark = True
+from utils.libero_dataset_core import get_train_val_sliced
+from utils.libero_dataset import LiberoGoalDataset
+from torch.utils.data import DataLoader
 
 
-task_num = 10
-result_list = [0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-num_eval_episodes = 20
-benchmark_dict = benchmark.get_benchmark_dict()
-task_suite = benchmark_dict["libero_goal"]()
+for i in [0, 6, 7, 16, 42]:
+    SNAPSHOT_PATH = f"pretrained_model/snapshot_{i}.pt"
+    IDM_PATH = f"pretrained_model/snapshot_{i}.pt"
 
-if __name__ == "__main__":
-    with open("result_pickle.txt", 'w') as f:
-        for j in range(task_num):
-            this_result_list = result_list[j * num_eval_episodes: (j + 1) * num_eval_episodes]
-            print("this_result_list :", this_result_list)
-            this_result_list = np.array(this_result_list)
-            avg_success = np.mean(this_result_list, axis=0)
-            task = task_suite.get_task(j)
-            task_name = task.name
-            print(f"Success rates for task {j} {task_name}:")
-            print(f"{avg_success * 100:.1f}%")
-
-            f.write(f"Success rates for task {j} {task_name}:")
-            f.write(f"{avg_success * 100:.1f}%\n")
+    with Path(SNAPSHOT_PATH).open("rb") as f:
+        idm = torch.load(f)
+    print(idm)
+        
+    # with Path(IDM_PATH).open("wb") as f:
+    #     torch.save(idm, f)

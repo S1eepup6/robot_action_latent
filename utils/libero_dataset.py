@@ -9,6 +9,7 @@ from utils.libero_dataset_core import TrajectoryDataset
 from transformers import BertTokenizer, BertModel
 import re
 from tqdm import tqdm
+import pickle
 
 ### Compute the bert embedding of the task description
 def get_task_embedding(task_name):
@@ -51,19 +52,23 @@ class LiberoGoalDataset(TrajectoryDataset):
     #              actions.npy
     def __init__(self, 
                  data_directory = "/data/libero/libero_dataset",
-                 subset_fraction: Optional[int] = None):
+                 subset_fraction: Optional[int] = 1):
         self.dir = Path(data_directory) / "libero_goal"
         self.task_names = list(self.dir.iterdir())
         self.task_names.sort()
         self.demos = []
         self.goals = []
-        for task_name in tqdm(self.task_names):
-            task_id = str(task_name).split('/')[-1]
-            self.goals.append(get_task_embedding(task_id.lower().replace("_", " ")))
+        
+        # with open('pretrained_model/libero_goal_goals.pkl', 'rb') as f:
+        #     self.goals = pickle.load(f)
+
+        for task_name in self.task_names:
+            # task_id = str(task_name).split('/')[-1]
+            # self.goals.append(get_task_embedding(task_id.lower().replace("_", " ")))
             self.demos += list(task_name.iterdir())
 
         self.subset_fraction = subset_fraction
-        if self.subset_fraction is not None:
+        if self.subset_fraction > 1:
             assert 50 % self.subset_fraction == 0
             # n = int(len(self.demos) * self.subset_fraction)
             self.demos = self.demos[::self.subset_fraction]
@@ -110,12 +115,12 @@ class LiberoGoalDataset(TrajectoryDataset):
         self.actions = pad_sequence(self.actions, batch_first=True).float()
 
         # last frame goal
-        # self.goals = None
-        # goals = []
-        # for i in range(10):
-        #     last_obs, _, _ = self.get_frames(i, [-1])  # 1 V C H W
-        #     goals.append(last_obs)
-        # self.goals = goals
+        self.goals = None
+        goals = []
+        for i in range(0, int(500 // self.subset_fraction), int(50 // self.subset_fraction)):
+            last_obs, _, _ = self.get_frames(i, [-1])  # 1 V C H W
+            goals.append(last_obs)
+        self.goals = goals
 
     def __len__(self):
         return len(self.demos)
@@ -164,15 +169,20 @@ if __name__ == "__main__":
 
     dataset = LiberoGoalDataset(subset_fraction=5)
     # dataset = LiberoGoalDataset()
-    data_loader = DataLoader(dataset, shuffle=True, batch_size=64)
+    # data_loader = DataLoader(dataset, shuffle=True, batch_size=64)
     
-    kwargs = {
-        "train_fraction": 0.999,
-        "random_seed": 42,
-        "window_size": 4+1,
-        "future_conditional": False,
-        "min_future_sep": 0,
-        "future_seq_len": 0,
-        "num_extra_predicted_actions": 0,
-    }
-    train_loader, test_loader = get_train_val_sliced(dataset, **kwargs)
+    # kwargs = {
+    #     "train_fraction": 0.999,
+    #     "random_seed": 42,
+    #     "window_size": 4+1,
+    #     "future_conditional": False,
+    #     "min_future_sep": 0,
+    #     "future_seq_len": 0,
+    #     "num_extra_predicted_actions": 0,
+    # }
+    # train_loader, test_loader = get_train_val_sliced(dataset, **kwargs)
+
+    import pickle
+
+    with open('pretrained_model/libero_goal_goals.pkl', 'wb') as f:
+        pickle.dump(dataset.goals, f)

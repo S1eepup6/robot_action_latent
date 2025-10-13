@@ -21,14 +21,18 @@ git push
 --------------------------------------------------
 
 python de.py && python eval_de.py
+python de_1.py && python eval_de1.py
 
 --------------------------------------------------
 
 torchrun --nproc_per_node=3 train.py --config-name=train_libero_goal && MUJOCO_GL=egl python3 online_eval.py --config-name=train_libero_goal
+python3 train.py --config-name=train_libero_goal && MUJOCO_GL=egl python3 online_eval.py --config-name=train_libero_goal
 
-75
-64
-86
+43 75
+0 64
+16 86
+6 90
+7 67
 
 --------------------------------------------------
 

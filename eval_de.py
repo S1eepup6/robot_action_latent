@@ -25,6 +25,8 @@ from collections import defaultdict, deque
 from tokenizer_api import Tokenizer
 from tqdm import tqdm
 
+from utils.libero_dataset import LiberoGoalDataset
+
 from de import *
 
 torch.backends.cudnn.benchmark = True
@@ -49,9 +51,10 @@ EVAL_MAX_STEP = 600
 ENCODER_PATH = "pretrained_model/encoder_16.pt"
 
 RESULT_FILE_NAME = "performance_de.pkl"
-AGENT_PATH = "/data/libero/exp_results/de.pt"
+AGENT_PATH = "/data/libero/exp_results/de_2.pt"
 #################### ARGUMENTS #####################
 
+dataset = LiberoGoalDataset()
 for i in tqdm(range(10)):
     agent = MYMODEL(device=DEVICE).to(DEVICE)
 
@@ -80,12 +83,14 @@ for i in tqdm(range(10)):
     task_name = task.name
     
     eval_start_time = time.time()
-    eval_until_episode = utils.Until(NUM_EVAL_EPI)
+    eval_until_episode = utils.Until(NUM_EVAL_EPI + WINDOW_SIZE)
 
     counter, episode, success = 0, 0, 0
     while eval_until_episode(episode):
         time_step = eval_env.reset()
-        step, q_res = 0, None
+        step, cur_goal = 0, None
+        obs_total_list = []
+
         while step < EVAL_MAX_STEP:
             if time_step['done']:
                 success += 1
@@ -101,33 +106,46 @@ for i in tqdm(range(10)):
                 obs_agent = torch.torch.as_tensor(obs_agent.copy(), device=DEVICE).unsqueeze(0)
                 obs_wrist = torch.torch.as_tensor(obs_wrist.copy(), device=DEVICE).unsqueeze(0)
                 state     = torch.torch.as_tensor(state, device=DEVICE).unsqueeze(0)
+                goal_obs = dataset.goals[i].to(DEVICE)
 
                 n_step, num_channel, img_size = obs_agent.shape[0], obs_agent.shape[1], obs_agent.shape[2]
                 
-                obs_embed = obs_agent.reshape(-1, num_channel, img_size, img_size).float()
-                obs_wrist = obs_wrist.reshape(-1, num_channel, img_size, img_size).float()
+                obs_embed = obs_agent.reshape(-1, num_channel, img_size, img_size).float() / 255.
+                obs_wrist = obs_wrist.reshape(-1, num_channel, img_size, img_size).float() / 255.
 
                 obs_total = torch.concatenate([obs_embed, obs_wrist], dim=0).unsqueeze(0)
-                obs_enc = agent.encoder(obs_total).flatten(start_dim=1)
 
                 # obs_state = state.float()
                 # obs_state = agent.encoder_state.forward(obs_state)
                 # cur_state = obs_state.reshape(n_step, -1)
 
-                if step % WINDOW_SIZE == 0 or q_res is None:
-                    cur_goal = agent.hl_policy(obs_enc, task_embedding)
-                    # q_loss, z_q, _, _, _ = agent.a_quantizer.forward(z_policy)
-
-                joint_act, gripper_act = agent.decoder(obs_enc, cur_goal)
-
-
-                joint_action = joint_act.detach().cpu().numpy()[0]
-                eef_action = gripper_act.detach().cpu().numpy()
-
-                if eef_action[0][0] < 0.5:
-                    eef_action[0][0] = -1
+                if step < WINDOW_SIZE:
+                    action = np.zeros(7)
+                    obs_total_list.append(obs_total)
                 else:
-                    eef_action[0][0] = 1
+                    obs_total_list = obs_total_list[1:]
+                    obs_total_list.append(obs_total)
+
+                    cur_obs_total = torch.tensor(obs_total_list)
+
+                    obs_enc = agent.encoder(cur_obs_total)
+                    if (step-WINDOW_SIZE) % WINDOW_SIZE == 0 or cur_goal is None:
+                        goal_enc = agent.encoder(goal_obs)
+                        goal_gpt = goal_enc[0].flatten(start_dim=0).repeat(WINDOW_SIZE, 1)
+                        gpt_input = torch.concat([obs_enc[:WINDOW_SIZE].flatten(start_dim=1), goal_gpt], dim=-1).unsqueeze(0)
+                        cur_goal = agent.hl_policy(gpt_input).flatten(start_dim=1)
+                        # q_loss, z_q, _, _, _ = agent.a_quantizer.forward(z_policy)
+
+                    joint_act, gripper_act = agent.decoder(obs_enc, cur_goal)
+
+
+                    joint_action = joint_act.detach().cpu().numpy()[0]
+                    eef_action = gripper_act.detach().cpu().numpy()
+
+                    if eef_action[0][0] < 0.5:
+                        eef_action[0][0] = -1
+                    else:
+                        eef_action[0][0] = 1
 
                 action = np.concatenate([joint_action, eef_action[0]], axis=-1)
 

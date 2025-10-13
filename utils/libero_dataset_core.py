@@ -174,7 +174,7 @@ class TrajectorySlicerDataset:
             observations, actions, mask = self.dataset.get_frames(i, range(start, end))
             observations = observations[: self.window]
 
-            values = [observations, actions, mask.bool()]
+            values = [observations, actions, mask]
         else:
             if self.future_conditional:
                 assert self.frame_step == 1, "NOT TESTED"
@@ -203,12 +203,12 @@ class TrajectorySlicerDataset:
                     future_obs = torch.zeros((self.future_seq_len, *obs_dims))
 
                 # [observations, actions, mask, future_obs (goal conditional)]
-                values = [obs, actions, mask.bool(), future_obs]
+                values = [obs, actions, mask, future_obs]
             else:
                 observations, actions, mask = self.dataset.get_frames(
                     i, range(start, end, self.frame_step)
                 )
-                values = [observations, actions, mask.bool()]
+                values = [observations, actions, mask]
 
         if end - start < self.window + self.num_extra_predicted_actions:
             # this only happens for repeating the very first frames
