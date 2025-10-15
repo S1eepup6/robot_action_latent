@@ -55,6 +55,12 @@ AGENT_PATH = "/data/libero/exp_results/de_2.pt"
 #################### ARGUMENTS #####################
 
 dataset = LiberoGoalDataset()
+
+task_idx = dict()
+for i, t in enumerate(dataset.task_names):
+    task_idx[str(t).split('/')[-1]] = i
+print(task_idx)
+
 for i in tqdm(range(10)):
     agent = MYMODEL(device=DEVICE).to(DEVICE)
 
@@ -69,7 +75,7 @@ for i in tqdm(range(10)):
     print(AGENT_PATH)
     agent.load_state_dict(torch.load(AGENT_PATH))
     
-    WINDOW_SIZE = agent.time_step
+    WINDOW_SIZE = 3
 
     ### Setup eval environment
     benchmark_dict = benchmark.get_benchmark_dict()
@@ -106,7 +112,7 @@ for i in tqdm(range(10)):
                 obs_agent = torch.torch.as_tensor(obs_agent.copy(), device=DEVICE).unsqueeze(0)
                 obs_wrist = torch.torch.as_tensor(obs_wrist.copy(), device=DEVICE).unsqueeze(0)
                 state     = torch.torch.as_tensor(state, device=DEVICE).unsqueeze(0)
-                goal_obs = dataset.goals[i].to(DEVICE)
+                goal_obs = dataset.goals[task_idx[task_name]].to(DEVICE)
 
                 n_step, num_channel, img_size = obs_agent.shape[0], obs_agent.shape[1], obs_agent.shape[2]
                 
@@ -126,28 +132,27 @@ for i in tqdm(range(10)):
                     obs_total_list = obs_total_list[1:]
                     obs_total_list.append(obs_total)
 
-                    cur_obs_total = torch.tensor(obs_total_list)
+                    cur_obs_total = torch.concatenate(obs_total_list, dim=0)
 
-                    obs_enc = agent.encoder(cur_obs_total)
+                    obs_enc = agent.encoder(cur_obs_total).unsqueeze(0)
                     if (step-WINDOW_SIZE) % WINDOW_SIZE == 0 or cur_goal is None:
                         goal_enc = agent.encoder(goal_obs)
-                        goal_gpt = goal_enc[0].flatten(start_dim=0).repeat(WINDOW_SIZE, 1)
-                        gpt_input = torch.concat([obs_enc[:WINDOW_SIZE].flatten(start_dim=1), goal_gpt], dim=-1).unsqueeze(0)
+                        goal_gpt = goal_enc[0].flatten(start_dim=0).repeat(WINDOW_SIZE, 1).unsqueeze(0)
+                        gpt_input = torch.concat([obs_enc[:WINDOW_SIZE].flatten(start_dim=2), goal_gpt], dim=-1)
                         cur_goal = agent.hl_policy(gpt_input).flatten(start_dim=1)
                         # q_loss, z_q, _, _, _ = agent.a_quantizer.forward(z_policy)
 
-                    joint_act, gripper_act = agent.decoder(obs_enc, cur_goal)
+                    joint_act, gripper_act = agent.decoder(obs_enc[:, -1].flatten(), cur_goal.flatten())
 
-
-                    joint_action = joint_act.detach().cpu().numpy()[0]
+                    joint_action = joint_act.detach().cpu().numpy()
                     eef_action = gripper_act.detach().cpu().numpy()
 
-                    if eef_action[0][0] < 0.5:
-                        eef_action[0][0] = -1
+                    if eef_action[0] < 0.5:
+                        eef_action[0] = -1
                     else:
-                        eef_action[0][0] = 1
+                        eef_action[0] = 1
 
-                action = np.concatenate([joint_action, eef_action[0]], axis=-1)
+                    action = np.concatenate([joint_action, eef_action], axis=-1)
 
             time_step = eval_env.step(action)
             step += 1

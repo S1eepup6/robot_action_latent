@@ -43,15 +43,15 @@ cudnn.deterministic = True
 random.seed(SEED)
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:2'
+DEVICE = 'cuda:0'
 DOWNSTREAM_TASK_SUITE = 'libero_goal'
 NUM_EVAL_EPI = 20
 EVAL_MAX_STEP = 600
 
 ENCODER_PATH = "pretrained_model/encoder_16.pt"
 
-RESULT_FILE_NAME = "performance_de2.pkl"
-AGENT_PATH = "/data/libero/exp_results/de2_2.pt"
+RESULT_FILE_NAME = "performance_deO.pkl"
+AGENT_PATH = "/data/libero/exp_results/deo.pt"
 #################### ARGUMENTS #####################
 
 dataset = LiberoGoalDataset()
@@ -76,7 +76,7 @@ for i in tqdm(range(10)):
     print(AGENT_PATH)
     agent = torch.load(AGENT_PATH).to(DEVICE)
     
-    WINDOW_SIZE = agent.time_step
+    WINDOW_SIZE = 10
 
     ### Setup eval environment
     benchmark_dict = benchmark.get_benchmark_dict()
@@ -96,8 +96,7 @@ for i in tqdm(range(10)):
     while eval_until_episode(episode):
         time_step = eval_env.reset()
         step, cur_goal = 0, None
-        obs_total_list = list()
-
+        obs_total_list = []
         while step < EVAL_MAX_STEP:
             if time_step['done']:
                 success += 1
@@ -137,19 +136,16 @@ for i in tqdm(range(10)):
 
                     obs_enc = agent.encoder(cur_obs_total).unsqueeze(0)
 
-                    goal_enc = agent.encoder(goal_obs)
-                    goal_enc = agent.encoder(goal_obs)
-                    goal_gpt = goal_enc[0].flatten(start_dim=0).repeat(WINDOW_SIZE, 1).unsqueeze(0)
-                    gpt_input = torch.concat([obs_enc[:WINDOW_SIZE].flatten(start_dim=2), goal_gpt], dim=-1)
-                    cur_goal = agent.hl_policy(gpt_input).flatten(start_dim=1)
+                    obs_enc = agent.encoder(cur_obs_total).flatten(start_dim=-2).unsqueeze(0)
+                    goal_enc = agent.encoder(goal_obs).flatten(start_dim=-2).repeat(WINDOW_SIZE, 1).unsqueeze(0)
 
-                    action, _, _ = agent.decoder(cur_goal, None)
+                    action, _, _ = agent.policy(obs_enc, goal_enc, None)
 
-                    action = action.detach().cpu().numpy()[0][0]
+                    action = action[0, -1, 0, :].detach().cpu().numpy()
 
-                for i in range(WINDOW_SIZE):
-                    time_step = eval_env.step(action[i])
-                    step += 1
+                time_step = eval_env.step(action)
+                step += 1
+
         episode += 1
 
     print(f'Task:{task_name} Evaluation Time:{time.time()-eval_start_time}s Success Rate:{success/NUM_EVAL_EPI*100}%', flush=True)

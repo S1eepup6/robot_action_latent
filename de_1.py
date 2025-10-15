@@ -35,7 +35,7 @@ from torch.utils.data import DataLoader
 
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:1'
+DEVICE = 'cuda:2'
 ENCODER_PATH = "pretrained_model/encoder_6.pt"
 SNAPSHOT_PATH = "pretrained_model/snapshot_6.pt"
 
@@ -152,7 +152,7 @@ class MYMODEL(nn.Module):
                     return
                 
             if save_file_name is not None and e % 10 == 0:
-                torch.save(self.state_dict(), save_file_name)
+                torch.save(self, save_file_name)
                 print("\nSAVE AT ", save_file_name)
 
 
@@ -209,7 +209,7 @@ class MYMODEL(nn.Module):
 
 
             if save_file_name is not None and e % 10 == 0:
-                torch.save(self.state_dict(), save_file_name)
+                torch.save(self, save_file_name)
                 print("\nSAVE AT ", save_file_name)
 
 
@@ -250,14 +250,14 @@ if __name__ == "__main__":
         train_loader, test_loader = get_train_val_sliced(dataset, **kwargs)
 
         m.pretrain(train_loader, PRETRAIN_EPOCH, False, save_file_name=s1_pt_name)
-        torch.save(m.state_dict(), s1_pt_name)
+        torch.save(m, s1_pt_name)
 
         del dataset
         del data_loader
         del train_loader
         del test_loader
 
-        m.load_state_dict(torch.load(s1_pt_name))
+        m = torch.load(s1_pt_name)
         
         dataset = LiberoGoalDataset(subset_fraction=5)
         data_loader = DataLoader(dataset, shuffle=True, batch_size=BATCH_SIZE)
@@ -274,7 +274,7 @@ if __name__ == "__main__":
         train_loader, test_loader = get_train_val_sliced(dataset, **kwargs)
 
         m.update(train_loader, FINETUNE_EPOCH, make_log=True, save_file_name=s2_pt_name)
-        torch.save(m.state_dict(), s2_pt_name)
+        torch.save(m, s2_pt_name)
 
 
     else:

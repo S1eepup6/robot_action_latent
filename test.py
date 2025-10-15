@@ -26,18 +26,38 @@ from models.encoder.resnet import *
 from models.hl_policy import *
 from models.decoder import *
 
+from models.vq_behavior_transformer.gpt import GPT, GPTConfig
+from models.vq_behavior_transformer.vqvae_decoder import vqvae_decoder
+
 from utils.libero_dataset_core import get_train_val_sliced
 from utils.libero_dataset import LiberoGoalDataset
 from torch.utils.data import DataLoader
 
 
-for i in [0, 6, 7, 16, 42]:
-    SNAPSHOT_PATH = f"pretrained_model/snapshot_{i}.pt"
-    IDM_PATH = f"pretrained_model/snapshot_{i}.pt"
+#################### ARGUMENTS #####################
+DEVICE = 'cuda:1'
+ENCODER_PATH = "pretrained_model/encoder_6.pt"
+SNAPSHOT_PATH = "pretrained_model/snapshot_6.pt"
 
-    with Path(SNAPSHOT_PATH).open("rb") as f:
-        idm = torch.load(f)
-    print(idm)
-        
-    # with Path(IDM_PATH).open("wb") as f:
-    #     torch.save(idm, f)
+TRAIN = True
+SEED = 0
+
+STAGE = 5
+
+OBS_SIZE = 3
+FUTURE_SIZE = 4
+WINDOW_SIZE = OBS_SIZE + FUTURE_SIZE
+
+BATCH_SIZE = 32
+PRETRAIN_EPOCH = 30
+FINETUNE_EPOCH = 20
+
+
+now = dt.datetime.now().strftime("%m-%d_%H:%M")
+s1_pt_name = "/data/libero/exp_results/deO.pt"
+#################### ARGUMENTS #####################
+
+from de_o import MYMODEL
+
+m = MYMODEL().to(DEVICE)
+torch.save(m, s1_pt_name)

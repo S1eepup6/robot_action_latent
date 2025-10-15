@@ -1,14 +1,14 @@
 cd robot_action_latent
 tmux new -s cuda0
-conda activate prise
+conda activate dynamo-repro
 
 cd robot_action_latent
 tmux new -s cuda1
-conda activate prise
+conda activate dynamo-repro
 
 cd robot_action_latent
 tmux new -s cuda2
-conda activate prise
+conda activate dynamo-repro
 
 tensorboard --logdir=runs
 
@@ -20,7 +20,7 @@ git push
 
 --------------------------------------------------
 
-python de.py && python eval_de.py
+python de_o.py && python eval_deo.py
 python de_1.py && python eval_de1.py
 
 --------------------------------------------------
