@@ -54,7 +54,7 @@ FINETUNE_EPOCH = 40
 
 
 now = dt.datetime.now().strftime("%m-%d_%H:%M")
-s1_pt_name = "/data/libero/exp_results/deo.pt"
+s1_pt_name = "/data/libero/exp_results/deoa.pt"
 #################### ARGUMENTS #####################
 
 class MYMODEL(nn.Module):
@@ -160,7 +160,7 @@ if __name__ == "__main__":
         # Model, optimizer set
         m = MYMODEL().to(device=DEVICE)
         
-        dataset = LiberoGoalDataset(subset_fraction=5)
+        dataset = LiberoGoalDataset(subset_fraction=1)
         
         kwargs = {
             "train_fraction": 0.999,

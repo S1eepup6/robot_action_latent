@@ -44,12 +44,12 @@ SEED = 0
 
 STAGE = 5
 
-OBS_SIZE = 3
+OBS_SIZE = 4
 FUTURE_SIZE = 4
 WINDOW_SIZE = OBS_SIZE + FUTURE_SIZE
 
 BATCH_SIZE = 32
-PRETRAIN_EPOCH = 30
+PRETRAIN_EPOCH = 40
 FINETUNE_EPOCH = 20
 
 
@@ -80,19 +80,15 @@ class MYMODEL(nn.Module):
         self.hl_policy = nn.Sequential(
             GPT(
                 GPTConfig(
-                    block_size=OBS_SIZE,
+                    block_size=4,
                     n_layer=6,
                     n_head=8,
                     n_embd=feature_dim,
-                    output_dim=feature_dim,
+                    output_dim=64,
                     dropout=0.0,
                     input_dim=512 * 2 * 2,
                 )
-            ),
-            nn.Flatten(),
-            nn.Linear(feature_dim * OBS_SIZE, feature_dim),
-            nn.GELU(),
-            nn.Linear(feature_dim, 64)
+            )
         )
 
         self.decoder = vqvae_decoder(
@@ -102,7 +98,7 @@ class MYMODEL(nn.Module):
             vqvae_groups=2,
             vqvae_fit_steps=882,
             vqvae_iters=300,
-            obs_window_size=WINDOW_SIZE,
+            obs_window_size=OBS_SIZE,
             act_window_size=self.time_step
         )
         
@@ -117,23 +113,23 @@ class MYMODEL(nn.Module):
                 obs, gt_act, final_goal = data
                 obs = obs.to(DEVICE)
 
-                next_obs = obs[1:]
-                obs = obs[:-1]
-                gt_act = gt_act.to(DEVICE)[:-1]
+                next_obs = obs[:, 1:]
+                obs = obs[:, :-1]
+                gt_act = gt_act.to(DEVICE)[:, :-1]
                 final_goal = final_goal.to(DEVICE)
 
                 with torch.no_grad():
-                    obs_enc = self.encoder(obs)  # (window_size, 2, 512)
-                    goal_enc = self.encoder(final_goal)  # (window_size, 2, 512)
-                    target = self.IDM(obs_enc[OBS_SIZE-1:OBS_SIZE+4].unsqueeze(0))
-                    target = target[:, -1:].flatten(start_dim=1)
+                    obs_enc = self.encoder(obs)  # (B, window_size, 2, 512)
+                    goal_enc = self.encoder(final_goal)  # (B, 1, 2, 512)
+                    target = self.IDM(obs_enc[:, -FUTURE_SIZE:])
+                    target = target.flatten(start_dim=-2)
 
-                goal_gpt = goal_enc[0].flatten(start_dim=0).repeat(OBS_SIZE, 1)
-                
-                gpt_input = torch.concat([obs_enc[:OBS_SIZE].flatten(start_dim=1), goal_gpt], dim=-1).unsqueeze(0)
+                goal_gpt = goal_enc[:, 0].unsqueeze(1)
+                goal_gpt = goal_gpt.repeat(1, OBS_SIZE, 1, 1)
+
+                gpt_input = torch.concat([goal_gpt, obs_enc[:, :OBS_SIZE]], dim=-1).flatten(start_dim=-2)
+                # print(gpt_input.shape)
                 action = self.hl_policy.forward(gpt_input)
-
-                # print(action.shape)
 
                 action_loss = F.mse_loss(action, target)
 
@@ -176,21 +172,22 @@ class MYMODEL(nn.Module):
                 obs = obs.to(DEVICE)
 
                 
-                next_obs = obs[1:]
-                obs = obs[:-1]
-                gt_act = gt_act.to(DEVICE)[1:]
+                next_obs = obs[:, 1:]
+                obs = obs[:, :-1]
+                gt_act = gt_act.to(DEVICE)[:, -(FUTURE_SIZE):]
                 final_goal = final_goal.to(DEVICE)
 
                 with torch.no_grad():
                     obs_enc = self.encoder(obs)
-                    goal_enc = self.encoder(final_goal) 
-                    goal_gpt = goal_enc[0].flatten(start_dim=0).repeat(OBS_SIZE, 1)               
-                    gpt_input = torch.concat([obs_enc[:OBS_SIZE].flatten(start_dim=1), goal_gpt], dim=-1).unsqueeze(0)
-                    goal = self.hl_policy.forward(gpt_input).unsqueeze(0)
 
-                # print(goal.shape, gt_act.shape)
-                action, loss, loss_dict = self.decoder(goal, action_seq=gt_act.unsqueeze(0))
-                # print(action.shape)
+                    goal_enc = self.encoder(final_goal) 
+                    goal_gpt = goal_enc[:, 0].flatten(start_dim=-2)
+                    goal_gpt = goal_gpt.repeat(OBS_SIZE, 1, 1).transpose(1, 0) 
+
+                    gpt_input = torch.concat([goal_gpt, obs_enc[:, :OBS_SIZE].flatten(start_dim=-2)], dim=-1)
+                    goal = self.hl_policy.forward(gpt_input)
+
+                action, loss, loss_dict = self.decoder(goal, action_seq=gt_act)
 
                 optim.zero_grad()
                 loss.backward()
@@ -236,8 +233,7 @@ if __name__ == "__main__":
         m = MYMODEL().to(device=DEVICE)
 
         dataset = LiberoGoalDataset()
-        data_loader = DataLoader(dataset, shuffle=True, batch_size=BATCH_SIZE)
-        
+
         kwargs = {
             "train_fraction": 0.999,
             "random_seed": SEED,
@@ -248,8 +244,9 @@ if __name__ == "__main__":
             "num_extra_predicted_actions": 0,
         }
         train_loader, test_loader = get_train_val_sliced(dataset, **kwargs)
+        data_loader = DataLoader(train_loader, shuffle=True, batch_size=BATCH_SIZE)
 
-        m.pretrain(train_loader, PRETRAIN_EPOCH, False, save_file_name=s1_pt_name)
+        m.pretrain(data_loader, PRETRAIN_EPOCH, False, save_file_name=s1_pt_name)
         torch.save(m, s1_pt_name)
 
         del dataset
@@ -260,7 +257,6 @@ if __name__ == "__main__":
         m = torch.load(s1_pt_name)
         
         dataset = LiberoGoalDataset(subset_fraction=5)
-        data_loader = DataLoader(dataset, shuffle=True, batch_size=BATCH_SIZE)
         
         kwargs = {
             "train_fraction": 0.999,
@@ -272,8 +268,9 @@ if __name__ == "__main__":
             "num_extra_predicted_actions": 0,
         }
         train_loader, test_loader = get_train_val_sliced(dataset, **kwargs)
+        data_loader = DataLoader(train_loader, shuffle=True, batch_size=BATCH_SIZE)
 
-        m.update(train_loader, FINETUNE_EPOCH, make_log=True, save_file_name=s2_pt_name)
+        m.update(data_loader, FINETUNE_EPOCH, make_log=True, save_file_name=s2_pt_name)
         torch.save(m, s2_pt_name)
 
 
@@ -283,19 +280,18 @@ if __name__ == "__main__":
         m = MYMODEL().to(device=DEVICE)
 
         dataset = LiberoGoalDataset(subset_fraction=5)
-        # dataset = LiberoGoalDataset()
-        data_loader = DataLoader(dataset, shuffle=True, batch_size=BATCH_SIZE)
         
         kwargs = {
             "train_fraction": 0.999,
             "random_seed": SEED,
-            "window_size": FUTURE_SIZE+1,
+            "window_size": WINDOW_SIZE+1,
             "future_conditional": False,
             "min_future_sep": 0,
             "future_seq_len": 0,
             "num_extra_predicted_actions": 0,
         }
         train_loader, test_loader = get_train_val_sliced(dataset, **kwargs)
+        data_loader = DataLoader(train_loader, shuffle=True, batch_size=BATCH_SIZE)
 
-        m.pretrain(train_loader, 1, False, None)
-        m.update(train_loader, 1, False, None)
+        m.pretrain(data_loader, 1, False, None)
+        m.update(data_loader, 1, False, None)

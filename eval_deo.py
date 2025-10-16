@@ -50,8 +50,8 @@ EVAL_MAX_STEP = 600
 
 ENCODER_PATH = "pretrained_model/encoder_16.pt"
 
-RESULT_FILE_NAME = "performance_deO.pkl"
-AGENT_PATH = "/data/libero/exp_results/deo.pt"
+RESULT_FILE_NAME = "performance_deoa.pkl"
+AGENT_PATH = "/data/libero/exp_results/deoa.pt"
 #################### ARGUMENTS #####################
 
 dataset = LiberoGoalDataset()
@@ -99,6 +99,7 @@ for i in tqdm(range(10)):
         obs_total_list = []
         while step < EVAL_MAX_STEP:
             if time_step['done']:
+                print("success")
                 success += 1
                 break
             with torch.no_grad():
@@ -134,12 +135,11 @@ for i in tqdm(range(10)):
 
                     cur_obs_total = torch.concatenate(obs_total_list, dim=0)
 
-                    obs_enc = agent.encoder(cur_obs_total).unsqueeze(0)
-
                     obs_enc = agent.encoder(cur_obs_total).flatten(start_dim=-2).unsqueeze(0)
                     goal_enc = agent.encoder(goal_obs).flatten(start_dim=-2).repeat(WINDOW_SIZE, 1).unsqueeze(0)
 
                     action, _, _ = agent.policy(obs_enc, goal_enc, None)
+                    # print(action.shape)
 
                     action = action[0, -1, 0, :].detach().cpu().numpy()
 

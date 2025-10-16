@@ -97,7 +97,7 @@ class LiberoWrapper(gym.Wrapper):
         )
         self.action_space = gym.spaces.Box(
             low=-1.,
-            high=255,
+            high=1.,
             shape=(7,),
             dtype=np.float32,
         )
@@ -107,7 +107,7 @@ class LiberoWrapper(gym.Wrapper):
         self._state = None
     
     def _get_pixel_obs(self, pixel_obs):
-        return pixel_obs[:, :, ::-1].transpose(
+        return pixel_obs[::-1].transpose(
             2, 0, 1
         )
     
