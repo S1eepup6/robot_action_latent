@@ -29,8 +29,9 @@ from models.decoder import *
 from models.vq_behavior_transformer.gpt import GPT, GPTConfig
 from models.vq_behavior_transformer.vqvae_decoder import vqvae_decoder
 
-from utils.libero_dataset_core import get_train_val_sliced
+from utils.libero_dataset_core import get_train_val_sliced, split_traj_datasets
 from utils.libero_dataset import LiberoGoalDataset
+from utils.vqbet_repro import TrajectorySlicerDataset
 from torch.utils.data import DataLoader
 
 
@@ -92,7 +93,7 @@ class MYMODEL(nn.Module):
         )
 
         self.decoder = vqvae_decoder(
-            gpt_output_dim=64,
+            gpt_output_dim=256,
             vqvae_latent_dim=feature_dim,
             vqvae_n_embed=16,
             vqvae_groups=2,
@@ -171,9 +172,6 @@ class MYMODEL(nn.Module):
 
                 obs = obs.to(DEVICE)
 
-                
-                next_obs = obs[:, 1:]
-                obs = obs[:, :-1]
                 gt_act = gt_act.to(DEVICE)[:, -(FUTURE_SIZE):]
                 final_goal = final_goal.to(DEVICE)
 
@@ -185,7 +183,7 @@ class MYMODEL(nn.Module):
                     goal_gpt = goal_gpt.repeat(OBS_SIZE, 1, 1).transpose(1, 0) 
 
                     gpt_input = torch.concat([goal_gpt, obs_enc[:, :OBS_SIZE].flatten(start_dim=-2)], dim=-1)
-                    goal = self.hl_policy.forward(gpt_input)
+                    goal = self.hl_policy.forward(gpt_input).flatten(start_dim=-2).unsqueeze(-2)
 
                 action, loss, loss_dict = self.decoder(goal, action_seq=gt_act)
 
@@ -232,19 +230,32 @@ if __name__ == "__main__":
         # Model, optimizer set
         m = MYMODEL().to(device=DEVICE)
 
-        dataset = LiberoGoalDataset()
-
+        dataset = LiberoGoalDataset(subset_fraction=5)
         kwargs = {
             "train_fraction": 0.999,
             "random_seed": SEED,
-            "window_size": WINDOW_SIZE+1,
-            "future_conditional": False,
+            "window_size": WINDOW_SIZE,
+            "future_conditional": True,
             "min_future_sep": 0,
             "future_seq_len": 0,
             "num_extra_predicted_actions": 0,
         }
-        train_loader, test_loader = get_train_val_sliced(dataset, **kwargs)
-        data_loader = DataLoader(train_loader, shuffle=True, batch_size=BATCH_SIZE)
+        train_data, test_data = split_traj_datasets(
+            dataset,
+            train_fraction=0.95,
+            random_seed=SEED,
+        )
+        traj_slicer_kwargs = {
+            "window": WINDOW_SIZE,
+            "action_window": 1,
+            "vqbet_get_future_action_chunk":1,
+            "future_conditional": True,
+            "min_future_sep": 10,
+            "future_seq_len": 1,
+            "use_libero_goal": True,
+        }
+        train_data = TrajectorySlicerDataset(train_data, **traj_slicer_kwargs)
+        data_loader = DataLoader(train_data, shuffle=True, batch_size=BATCH_SIZE)
 
         m.pretrain(data_loader, PRETRAIN_EPOCH, False, save_file_name=s1_pt_name)
         torch.save(m, s1_pt_name)
@@ -257,18 +268,31 @@ if __name__ == "__main__":
         m = torch.load(s1_pt_name)
         
         dataset = LiberoGoalDataset(subset_fraction=5)
-        
         kwargs = {
             "train_fraction": 0.999,
             "random_seed": SEED,
             "window_size": WINDOW_SIZE,
-            "future_conditional": False,
+            "future_conditional": True,
             "min_future_sep": 0,
             "future_seq_len": 0,
             "num_extra_predicted_actions": 0,
         }
-        train_loader, test_loader = get_train_val_sliced(dataset, **kwargs)
-        data_loader = DataLoader(train_loader, shuffle=True, batch_size=BATCH_SIZE)
+        train_data, test_data = split_traj_datasets(
+            dataset,
+            train_fraction=0.95,
+            random_seed=SEED,
+        )
+        traj_slicer_kwargs = {
+            "window": WINDOW_SIZE,
+            "action_window": 1,
+            "vqbet_get_future_action_chunk":1,
+            "future_conditional": True,
+            "min_future_sep": 10,
+            "future_seq_len": 3,
+            "use_libero_goal": True,
+        }
+        train_data = TrajectorySlicerDataset(train_data, **traj_slicer_kwargs)
+        data_loader = DataLoader(train_data, shuffle=True, batch_size=BATCH_SIZE)
 
         m.update(data_loader, FINETUNE_EPOCH, make_log=True, save_file_name=s2_pt_name)
         torch.save(m, s2_pt_name)
@@ -278,20 +302,33 @@ if __name__ == "__main__":
             
         # Model, optimizer set
         m = MYMODEL().to(device=DEVICE)
-
-        dataset = LiberoGoalDataset(subset_fraction=5)
         
+        dataset = LiberoGoalDataset(subset_fraction=5)
         kwargs = {
             "train_fraction": 0.999,
             "random_seed": SEED,
-            "window_size": WINDOW_SIZE+1,
-            "future_conditional": False,
+            "window_size": WINDOW_SIZE,
+            "future_conditional": True,
             "min_future_sep": 0,
             "future_seq_len": 0,
             "num_extra_predicted_actions": 0,
         }
-        train_loader, test_loader = get_train_val_sliced(dataset, **kwargs)
-        data_loader = DataLoader(train_loader, shuffle=True, batch_size=BATCH_SIZE)
+        train_data, test_data = split_traj_datasets(
+            dataset,
+            train_fraction=0.95,
+            random_seed=SEED,
+        )
+        traj_slicer_kwargs = {
+            "window": WINDOW_SIZE,
+            "action_window": 1,
+            "vqbet_get_future_action_chunk":1,
+            "future_conditional": True,
+            "min_future_sep": 10,
+            "future_seq_len": 1,
+            "use_libero_goal": True,
+        }
+        train_data = TrajectorySlicerDataset(train_data, **traj_slicer_kwargs)
+        data_loader = DataLoader(train_data, shuffle=True, batch_size=BATCH_SIZE)
 
-        m.pretrain(data_loader, 1, False, None)
+        # m.pretrain(data_loader, 1, False, None)
         m.update(data_loader, 1, False, None)

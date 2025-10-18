@@ -107,7 +107,7 @@ class LiberoWrapper(gym.Wrapper):
         self._state = None
     
     def _get_pixel_obs(self, pixel_obs):
-        return pixel_obs[::-1].transpose(
+        return pixel_obs.transpose(
             2, 0, 1
         )
     

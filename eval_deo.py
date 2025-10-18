@@ -99,7 +99,6 @@ for i in tqdm(range(10)):
         obs_total_list = []
         while step < EVAL_MAX_STEP:
             if time_step['done']:
-                print("success")
                 success += 1
                 break
             with torch.no_grad():

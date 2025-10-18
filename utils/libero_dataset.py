@@ -143,7 +143,7 @@ class LiberoGoalDataset(TrajectoryDataset):
 
         if self.goals is not None:
             task_idx = idx // int(50 // self.subset_fraction)
-            goal = self.goals[task_idx]
+            goal = self.goals[task_idx].repeat(len(frames), 1, 1, 1, 1)
             return obs, act, goal
         else:
             return obs, act, None
