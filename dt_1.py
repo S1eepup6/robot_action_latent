@@ -103,8 +103,7 @@ def main():
 
     IDM = torch.load(SNAPSHOT_PATH).to(DEVICE).eval()
     
-    hl_policy = nn.Sequential(
-        GPT(
+    hl_policy = GPT(
             GPTConfig(
                 block_size=4,
                 n_layer=6,
@@ -114,8 +113,7 @@ def main():
                 dropout=0.0,
                 input_dim=512 * 2 * 2,
             )
-        )
-    ).to(DEVICE)
+        ).to(DEVICE)
 
     decoder = vqvae_decoder(
         gpt_output_dim=256,
@@ -128,8 +126,16 @@ def main():
         act_window_size=FUTURE_SIZE
     ).to(DEVICE)
 
-    hl_policy_optimizer = torch.optim.AdamW(hl_policy.parameters(), lr=5e-5)
-    decoder_optimizer = torch.optim.AdamW(decoder.parameters(), lr=5e-5)
+    hl_policy_optimizer = hl_policy.configure_optimizers(
+        weight_decay=2e-4,
+        learning_rate=5.5e-5,
+        betas=[0.9, 0.999]
+    )
+    decoder_optimizer = decoder.configure_optimizers(
+        weight_decay=2e-4,
+        learning_rate=5.5e-5,
+        betas=[0.9, 0.999]
+    )
 
     with torch.no_grad():
         # calculate goal embeddings for each task

@@ -37,8 +37,6 @@ torch.backends.cudnn.deterministic = True
 random.seed(SEED)
 
 #################### ARGUMENTS #####################
-from de_oa import MYMODEL
-
 DEVICE = 'cuda:0'
 NUM_EVAL_EPI = 20
 EVAL_MAX_STEP = 600
@@ -46,14 +44,15 @@ EVAL_MAX_STEP = 600
 WINDOW_SIZE = 10
 ACTION_WINDOW_SIZE = 1
 
-RESULT_FILE_NAME = "performance_deoa.pkl"
-AGENT_PATH = "/data/libero/exp_results/deoa.pt"
+RESULT_FILE_NAME = "performance_deo.pkl"
+ENCODER_PATH = "pretrained_model/encoder_6.pt"
+AGENT_PATH = "/data/libero/exp_results/deo.pt"
 #################### ARGUMENTS #####################
 
 def main():
     
     cbet_model = torch.load(AGENT_PATH).to(DEVICE)
-    encoder = cbet_model.encoder
+    encoder = torch.load(ENCODER_PATH).to(DEVICE)
 
     dataset = LiberoGoalDataset()
     with torch.no_grad():
@@ -108,7 +107,7 @@ def main():
                     goal = torch.as_tensor(goal, dtype=torch.float32, device=DEVICE)
                     # goal = embed(encoder, goal)
                     goal = goal.unsqueeze(0).repeat(WINDOW_SIZE, 1)
-                    action, _, _ = cbet_model.policy(obs.unsqueeze(0), goal.unsqueeze(0), None)
+                    action, _, _ = cbet_model(obs.unsqueeze(0), goal.unsqueeze(0), None)
                     action = action[0]  # remove batch dim; always 1
                     if ACTION_WINDOW_SIZE > 1:
                         action_list.append(action[-1].cpu().detach().numpy())

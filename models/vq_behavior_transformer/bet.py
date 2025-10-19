@@ -80,6 +80,7 @@ class BehaviorTransformer(nn.Module):
         gamma: float = 2.0,
         obs_window_size: int = 10,
         act_window_size: int = 10,
+        device : str = None
     ):
         super().__init__()
         self.GOAL_SPEC = ["concat", "stack", "unconditional"]
@@ -92,6 +93,8 @@ class BehaviorTransformer(nn.Module):
             self._cbet_method = "unconditional"
         else:
             self._cbet_method = "stack"
+
+        self.device = device
 
         self._gpt_model = GPT(
             GPTConfig(
@@ -170,8 +173,7 @@ class BehaviorTransformer(nn.Module):
         )
         pbar = tqdm.trange(
             self.vqvae_iters,
-            desc="VQ training",
-            disable=not accelerator.is_local_main_process,
+            desc="VQ training"
         )
         for epoch in pbar:
             shuffle_idx = torch.randperm(len(all_actions))
@@ -181,10 +183,7 @@ class BehaviorTransformer(nn.Module):
                 self._vqvae_optim.zero_grad()
                 loss.backward()
                 self._vqvae_optim.step()
-        accelerator.wait_for_everyone()
         # wrapping the the model in DDP syncs the weights from main to other processes
-        self._vqvae_model = accelerator.prepare(self._vqvae_model)
-        self._vqvae_model = accelerator.unwrap_model(self._vqvae_model)
         self._vqvae_model.eval()
         print("n_different_codes", len(torch.unique(vq_code)))
         print("n_different_combinations", len(torch.unique(vq_code, dim=0)))
@@ -208,7 +207,7 @@ class BehaviorTransformer(nn.Module):
             and (len(self._collected_actions) < self.vqvae_fit_steps)
             and (self.training)
         ):
-            action_seq_all = accelerator.gather(action_seq)
+            action_seq_all = action_seq
             self._collected_actions.append(self._unpack_actions(action_seq_all))
             self._maybe_fit_vq()
 

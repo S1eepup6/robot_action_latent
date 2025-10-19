@@ -278,20 +278,13 @@ class vqvae_decoder(nn.Module):
         return predicted_action, decoded_action, sampled_centers, sampled_offsets
 
     def configure_optimizers(self, weight_decay, learning_rate, betas):
-        optimizer1 = self._gpt_model.configure_optimizers(
-            weight_decay=weight_decay,
-            learning_rate=learning_rate,
-            betas=betas,
-        )
-
-        optimizer1.add_param_group({"params": self._map_to_cbet_preds_bin.parameters()})
         optimizer2 = torch.optim.AdamW(
             self._map_to_cbet_preds_offset.parameters(),
             lr=learning_rate,
             weight_decay=weight_decay,
             betas=betas,
         )
-        optim = GroupedOptimizer([optimizer1, optimizer2])
+        optim = GroupedOptimizer([optimizer2])
         return optim
 
     def load_model(self, path: Path):
