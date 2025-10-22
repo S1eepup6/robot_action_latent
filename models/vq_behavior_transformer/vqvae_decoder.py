@@ -148,7 +148,6 @@ class vqvae_decoder(nn.Module):
         pbar = tqdm.trange(
             self.vqvae_iters,
             desc="VQ training",
-            disable=not accelerator.is_local_main_process,
         )
         for epoch in pbar:
             shuffle_idx = torch.randperm(len(all_actions))
@@ -158,10 +157,7 @@ class vqvae_decoder(nn.Module):
                 self._vqvae_optim.zero_grad()
                 loss.backward()
                 self._vqvae_optim.step()
-        accelerator.wait_for_everyone()
         # wrapping the the model in DDP syncs the weights from main to other processes
-        self._vqvae_model = accelerator.prepare(self._vqvae_model)
-        self._vqvae_model = accelerator.unwrap_model(self._vqvae_model)
         self._vqvae_model.eval()
         print("n_different_codes", len(torch.unique(vq_code)))
         print("n_different_combinations", len(torch.unique(vq_code, dim=0)))
@@ -179,6 +175,14 @@ class vqvae_decoder(nn.Module):
         gpt_output: torch.Tensor,
         action_seq: Optional[torch.Tensor] = None,
     ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor], Dict[str, float]]:
+        if (
+            (action_seq is not None)
+            and (len(self._collected_actions) < self.vqvae_fit_steps)
+            and (self.training)
+        ):
+            action_seq_all = action_seq
+            self._collected_actions.append(self._unpack_actions(action_seq_all))
+            self._maybe_fit_vq()
 
         cbet_logits, cbet_offsets = self._forward_heads(gpt_output)
         predicted_action, decoded_action, sampled_centers, sampled_offsets = (
