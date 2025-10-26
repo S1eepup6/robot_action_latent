@@ -36,7 +36,7 @@ def seed_everything(random_seed: int):
     random.seed(random_seed)
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:2'
+DEVICE = 'cuda:1'
 ENCODER_PATH = "pretrained_model/encoder_6.pt"
 SNAPSHOT_PATH = "pretrained_model/snapshot_6.pt"
 
@@ -45,7 +45,7 @@ SEED = 42
 
 STAGE = 5
 
-OBS_SIZE = 10
+OBS_SIZE = 8
 FUTURE_SIZE = 8
 WINDOW_SIZE = OBS_SIZE + FUTURE_SIZE
 
@@ -65,8 +65,8 @@ else: # TEST
     SUBSET_FRACTION_PRETRAIN = 25
     SUBSET_FRACTION_FINETUNE = 5
 
-s1_pt_name = "/data/libero/exp_results/de1_1.pt"
-s2_pt_name = "/data/libero/exp_results/de1_2.pt"
+s1_pt_name = "/data/libero/exp_results/do2_1.pt"
+s2_pt_name = "/data/libero/exp_results/do2_2.pt"
 #################### ARGUMENTS #####################
 
 def main():
@@ -131,7 +131,7 @@ def main():
         vqvae_fit_steps=1867,
         vqvae_iters=300,
         obs_window_size=OBS_SIZE,
-        act_window_size=4
+        act_window_size=FUTURE_SIZE
     ).to(DEVICE)
 
     hl_policy_optimizer = hl_policy.configure_optimizers(
@@ -228,7 +228,7 @@ def main():
                             )
                         action_list = new_action_list
                     else:
-                        curr_action = action[-1, step % 4, :].cpu().detach().numpy()
+                        curr_action = action[-1, step % FUTURE_SIZE, :].cpu().detach().numpy()
 
                     this_obs, reward, done, info = env.step(curr_action)
                     this_obs_enc = embed(encoder, this_obs)
@@ -324,7 +324,6 @@ def main():
 
     for epoch in tqdm.trange(FINETUNE_EPOCH):
         decoder.eval()
-        hl_policy.eval()
         if epoch % 5 == 0 and epoch > 0:
             avg_reward, completion_id_list, max_coverage, final_coverage = eval_on_env(
                 epoch=epoch,
@@ -333,30 +332,21 @@ def main():
             reward_history.append(avg_reward)
 
         decoder.train()
-        hl_policy.train()
         finetune_pbar = tqdm.tqdm(train_loader)
         for data in finetune_pbar:
             decoder_optimizer.zero_grad()
-            hl_policy_optimizer.zero_grad()
             obs, act, goal = (x.to(DEVICE) for x in data)
-            with torch.no_grad():
-                target = IDM(obs[:, -4:])
-                target = target.flatten(start_dim=-2)
             obs = einops.rearrange(obs, "N T V E -> N T (V E)")
             goal = einops.rearrange(goal, "N T V E -> N T (V E)")
+            with torch.no_grad():
+                gpt_input = torch.concat([goal[:, :OBS_SIZE], obs[:, :OBS_SIZE]], dim=-1).to(DEVICE)
+                # print(gpt_input.shape)
+                subgoal = hl_policy.forward(gpt_input)[:, -4:].flatten(start_dim=-2).unsqueeze(-2)
 
-            gpt_input = torch.concat([goal[:, :OBS_SIZE], obs[:, :OBS_SIZE]], dim=-1).to(DEVICE)
-            # print(gpt_input.shape)
-            subgoal = hl_policy.forward(gpt_input)[:, -4:]
-            subgoal_loss = F.mse_loss(subgoal, target)
-
-            action, loss, loss_dict = decoder(subgoal.flatten(start_dim=-2).unsqueeze(-2), action_seq=act[:, -4:].to(DEVICE))
-
-            loss = loss + subgoal_loss
+            action, loss, loss_dict = decoder(subgoal, action_seq=act[:, OBS_SIZE:].to(DEVICE))
 
             loss.backward()
             decoder_optimizer.step()
-            hl_policy_optimizer.step()
             finetune_pbar.set_description("loss {0:.6f}".format(loss.item()))
         torch.save(decoder, s2_pt_name)
 
