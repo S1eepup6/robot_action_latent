@@ -54,19 +54,19 @@ ACTION_WINDOW_SIZE = 1
 BATCH_SIZE = 32
 if TRAIN:
     NUM_EVAL_PER_GOAL = 10
-    PRETRAIN_EPOCH = 50
-    FINETUNE_EPOCH = 50
+    PRETRAIN_EPOCH = 60
+    FINETUNE_EPOCH = 100
     SUBSET_FRACTION_PRETRAIN = 1
-    SUBSET_FRACTION_FINETUNE = 1
+    SUBSET_FRACTION_FINETUNE = 2
 else: # TEST 
     NUM_EVAL_PER_GOAL = 1
     PRETRAIN_EPOCH = 1
-    FINETUNE_EPOCH = 10
+    FINETUNE_EPOCH = 2
     SUBSET_FRACTION_PRETRAIN = 25
-    SUBSET_FRACTION_FINETUNE = 5
+    SUBSET_FRACTION_FINETUNE = 25
 
-s1_pt_name = "/data/libero/exp_results/de1_1.pt"
-s2_pt_name = "/data/libero/exp_results/de1_2.pt"
+s1_pt_name = "/data/libero/exp_results/do3_1.pt"
+s2_pt_name = "/data/libero/exp_results/do3_2.pt"
 #################### ARGUMENTS #####################
 
 def main():
@@ -123,16 +123,25 @@ def main():
             )
         ).to(DEVICE)
 
-    decoder = vqvae_decoder(
-        gpt_output_dim=256,
-        vqvae_latent_dim=512,
-        vqvae_n_embed=16,
-        vqvae_groups=2,
-        vqvae_fit_steps=1867,
-        vqvae_iters=300,
-        obs_window_size=OBS_SIZE,
-        act_window_size=4
-    ).to(DEVICE)
+    decoder = BehaviorTransformer(
+            obs_dim=512,
+            act_dim=7,
+            goal_dim=128,
+            views=2,
+            vqvae_batch_size=2048,
+            vqvae_latent_dim=512,
+            vqvae_n_embed=16,
+            vqvae_groups=2,
+            vqvae_fit_steps=941,
+            vqvae_iters=600,
+            n_layer=6,
+            n_head=6,
+            n_embd=120,
+            act_scale=1,
+            obs_window_size=OBS_SIZE,
+            act_window_size=4,
+            offset_loss_multiplier=100
+        ).to(DEVICE)
 
     hl_policy_optimizer = hl_policy.configure_optimizers(
         weight_decay=2e-4,
@@ -205,10 +214,11 @@ def main():
                     # goal = embed(encoder, goal)
                     goal = goal.unsqueeze(0).repeat(WINDOW_SIZE, 1).unsqueeze(0)
 
-                    if step % FUTURE_SIZE == 0:
+                    if step % 4 == 0:
                         gpt_input = torch.concat([goal[:, :OBS_SIZE], obs[:, :OBS_SIZE]], dim=-1)
                         subgoal = hl_policy.forward(gpt_input)[:, -4:].flatten(start_dim=-2).unsqueeze(-2)
-                        action, _, _ = decoder(subgoal)
+                        subgoal = subgoal.repeat(OBS_SIZE, 1, 1).transpose(1, 0)
+                        action, _, _ = decoder(obs, subgoal, action_seq=None)
                         action = action[0]  # remove batch dim; always 1
 
                     if ACTION_WINDOW_SIZE > 1:
@@ -228,7 +238,7 @@ def main():
                             )
                         action_list = new_action_list
                     else:
-                        curr_action = action[-1, step % 4, :].cpu().detach().numpy()
+                        curr_action = action[-1, (-4 + (step % 4)), :].cpu().detach().numpy()
 
                     this_obs, reward, done, info = env.step(curr_action)
                     this_obs_enc = embed(encoder, this_obs)
@@ -240,6 +250,7 @@ def main():
                     eval_pbar.set_description("total_reward : {0}".format(avg_reward))
                 avg_reward += total_reward
                 completion_id_list.append(info["all_completions_ids"])
+        print()
         return (
             avg_reward / (num_evals * num_eval_per_goal),
             completion_id_list,
@@ -324,7 +335,6 @@ def main():
 
     for epoch in tqdm.trange(FINETUNE_EPOCH):
         decoder.eval()
-        hl_policy.eval()
         if epoch % 5 == 0 and epoch > 0:
             avg_reward, completion_id_list, max_coverage, final_coverage = eval_on_env(
                 epoch=epoch,
@@ -333,31 +343,24 @@ def main():
             reward_history.append(avg_reward)
 
         decoder.train()
-        hl_policy.train()
         finetune_pbar = tqdm.tqdm(train_loader)
         for data in finetune_pbar:
             decoder_optimizer.zero_grad()
-            hl_policy_optimizer.zero_grad()
             obs, act, goal = (x.to(DEVICE) for x in data)
-            with torch.no_grad():
-                target = IDM(obs[:, -4:])
-                target = target.flatten(start_dim=-2)
             obs = einops.rearrange(obs, "N T V E -> N T (V E)")
             goal = einops.rearrange(goal, "N T V E -> N T (V E)")
+            with torch.no_grad():
+                gpt_input = torch.concat([goal[:, :OBS_SIZE], obs[:, :OBS_SIZE]], dim=-1).to(DEVICE)
+                # print(gpt_input.shape)
+                subgoal = hl_policy.forward(gpt_input)[:, -4:].flatten(start_dim=-2) # N G
+                subgoal = subgoal.repeat(OBS_SIZE, 1, 1).transpose(1, 0)
 
-            gpt_input = torch.concat([goal[:, :OBS_SIZE], obs[:, :OBS_SIZE]], dim=-1).to(DEVICE)
-            # print(gpt_input.shape)
-            subgoal = hl_policy.forward(gpt_input)[:, -4:]
-            subgoal_loss = F.mse_loss(subgoal, target)
-
-            action, loss, loss_dict = decoder(subgoal.flatten(start_dim=-2).unsqueeze(-2), action_seq=act[:, -4:].to(DEVICE))
-
-            loss = loss + subgoal_loss
+            # print(obs.shape, subgoal.shape)
+            action, loss, loss_dict = decoder(obs[:, :OBS_SIZE], subgoal, action_seq=act[:, OBS_SIZE:OBS_SIZE+4].to(DEVICE))
 
             loss.backward()
             decoder_optimizer.step()
-            hl_policy_optimizer.step()
-            finetune_pbar.set_description("loss {0:.6f}".format(loss.item()))
+            finetune_pbar.set_description("EPOCH {0}, loss {1:.6f}".format(epoch, loss.item()))
         torch.save(decoder, s2_pt_name)
 
     avg_reward, completion_id_list, max_coverage, final_coverage = eval_on_env(

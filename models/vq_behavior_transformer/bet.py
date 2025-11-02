@@ -185,6 +185,7 @@ class BehaviorTransformer(nn.Module):
                 self._vqvae_optim.step()
         # wrapping the the model in DDP syncs the weights from main to other processes
         self._vqvae_model.eval()
+        print("\n\n")
         print("n_different_codes", len(torch.unique(vq_code)))
         print("n_different_combinations", len(torch.unique(vq_code, dim=0)))
         print("losses", loss_dict)
@@ -208,7 +209,7 @@ class BehaviorTransformer(nn.Module):
             and (self.training)
         ):
             action_seq_all = action_seq
-            self._collected_actions.append(self._unpack_actions(action_seq_all))
+            self._collected_actions.append(self._unpack_actions(action_seq_all)[:, -1:])
             self._maybe_fit_vq()
 
         if obs_seq.shape[1] < self._obs_window_size:
@@ -322,7 +323,7 @@ class BehaviorTransformer(nn.Module):
         # offset on each residual VQ group; sum on group dim
         sampled_offsets = sampled_offsets.sum(dim=2)
         predicted_action = decoded_action + sampled_offsets
-        return predicted_action, decoded_action, sampled_centers, sampled_offsets
+        return predicted_action[:, -1:], decoded_action, sampled_centers, sampled_offsets
 
     def configure_optimizers(self, weight_decay, learning_rate, betas):
         optimizer1 = self._gpt_model.configure_optimizers(

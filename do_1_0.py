@@ -45,8 +45,8 @@ SEED = 42
 
 STAGE = 5
 
-OBS_SIZE = 8
-FUTURE_SIZE = 4
+OBS_SIZE = 10
+FUTURE_SIZE = 8
 WINDOW_SIZE = OBS_SIZE + FUTURE_SIZE
 
 ACTION_WINDOW_SIZE = 1
@@ -54,10 +54,10 @@ ACTION_WINDOW_SIZE = 1
 BATCH_SIZE = 32
 if TRAIN:
     NUM_EVAL_PER_GOAL = 10
-    PRETRAIN_EPOCH = 50
-    FINETUNE_EPOCH = 50
+    PRETRAIN_EPOCH = 60
+    FINETUNE_EPOCH = 100
     SUBSET_FRACTION_PRETRAIN = 1
-    SUBSET_FRACTION_FINETUNE = 1
+    SUBSET_FRACTION_FINETUNE = 5
 else: # TEST 
     NUM_EVAL_PER_GOAL = 1
     PRETRAIN_EPOCH = 1
@@ -65,8 +65,8 @@ else: # TEST
     SUBSET_FRACTION_PRETRAIN = 25
     SUBSET_FRACTION_FINETUNE = 25
 
-s1_pt_name = "/data/libero/exp_results/do3_1.pt"
-s2_pt_name = "/data/libero/exp_results/do3_2.pt"
+s1_pt_name = "/data/libero/exp_results/do0_1.pt"
+s2_pt_name = "/data/libero/exp_results/do0_2.pt"
 #################### ARGUMENTS #####################
 
 def main():
@@ -132,13 +132,13 @@ def main():
             vqvae_latent_dim=512,
             vqvae_n_embed=16,
             vqvae_groups=2,
-            vqvae_fit_steps=1946,
+            vqvae_fit_steps=374,
             vqvae_iters=600,
             n_layer=6,
             n_head=6,
             n_embd=120,
             act_scale=1,
-            obs_window_size=4,
+            obs_window_size=OBS_SIZE,
             act_window_size=4,
             offset_loss_multiplier=100
         ).to(DEVICE)
@@ -214,7 +214,7 @@ def main():
                     # goal = embed(encoder, goal)
                     goal = goal.unsqueeze(0).repeat(WINDOW_SIZE, 1).unsqueeze(0)
 
-                    if step % FUTURE_SIZE == 0:
+                    if step % 4 == 0:
                         gpt_input = torch.concat([goal[:, :OBS_SIZE], obs[:, :OBS_SIZE]], dim=-1)
                         subgoal = hl_policy.forward(gpt_input)[:, -4:].flatten(start_dim=-2).unsqueeze(-2)
                         subgoal = subgoal.repeat(OBS_SIZE, 1, 1).transpose(1, 0)
@@ -238,7 +238,7 @@ def main():
                             )
                         action_list = new_action_list
                     else:
-                        curr_action = action[-1, (-4 + (step % FUTURE_SIZE)), :].cpu().detach().numpy()
+                        curr_action = action[-1, (-4 + (step % 4)), :].cpu().detach().numpy()
 
                     this_obs, reward, done, info = env.step(curr_action)
                     this_obs_enc = embed(encoder, this_obs)
@@ -250,6 +250,7 @@ def main():
                     eval_pbar.set_description("total_reward : {0}".format(avg_reward))
                 avg_reward += total_reward
                 completion_id_list.append(info["all_completions_ids"])
+        print()
         return (
             avg_reward / (num_evals * num_eval_per_goal),
             completion_id_list,
@@ -355,11 +356,11 @@ def main():
                 subgoal = subgoal.repeat(OBS_SIZE, 1, 1).transpose(1, 0)
 
             # print(obs.shape, subgoal.shape)
-            action, loss, loss_dict = decoder(obs[:, :OBS_SIZE], subgoal, action_seq=act[:, -4:].to(DEVICE))
+            action, loss, loss_dict = decoder(obs[:, :OBS_SIZE], subgoal, action_seq=act[:, OBS_SIZE:OBS_SIZE+4].to(DEVICE))
 
             loss.backward()
             decoder_optimizer.step()
-            finetune_pbar.set_description("loss {0:.6f}".format(loss.item()))
+            finetune_pbar.set_description("EPOCH {0}, loss {1:.6f}".format(epoch, loss.item()))
         torch.save(decoder, s2_pt_name)
 
     avg_reward, completion_id_list, max_coverage, final_coverage = eval_on_env(
