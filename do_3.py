@@ -216,7 +216,7 @@ def main():
 
                     if step % FUTURE_SIZE == 0:
                         gpt_input = torch.concat([goal[:, :OBS_SIZE], obs[:, :OBS_SIZE]], dim=-1)
-                        subgoal = hl_policy.forward(gpt_input)[:, -4:].flatten(start_dim=-2).unsqueeze(-2)
+                        subgoal = hl_policy.forward(gpt_input)[:, -1:].flatten(start_dim=-2).unsqueeze(-2)
                         subgoal = subgoal.repeat(OBS_SIZE, 1, 1).transpose(1, 0)
                         action, _, _ = decoder(obs, subgoal, action_seq=None)
                         action = action[0]  # remove batch dim; always 1

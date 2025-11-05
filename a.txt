@@ -28,11 +28,16 @@ python de_1.py && python eval_de1.py
 torchrun --nproc_per_node=3 train.py --config-name=train_libero_goal && MUJOCO_GL=egl python3 online_eval.py --config-name=train_libero_goal
 python3 train.py --config-name=train_libero_goal && MUJOCO_GL=egl python3 online_eval.py --config-name=train_libero_goal
 
+--------------------------------------------------
+
 0.81 - 전체 최대
+원래 골 포함하면 0.875
+
 0.79 - 50% 최대
+원래 골 포함하면 0.78
+
 0.71 - 10% 최대
+원래 골 포함하면 0.76
 
 0.715
-
---------------------------------------------------
 

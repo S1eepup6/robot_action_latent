@@ -34,7 +34,7 @@ def seed_everything(random_seed: int):
     random.seed(random_seed)
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:0'
+DEVICE = 'cuda:1'
 ENCODER_PATH = "pretrained_model/encoder_6.pt"
 SNAPSHOT_PATH = "pretrained_model/snapshot_6.pt"
 
@@ -50,11 +50,11 @@ WINDOW_SIZE = OBS_SIZE + FUTURE_SIZE
 ACTION_WINDOW_SIZE = 1
 
 BATCH_SIZE = 32
-PRETRAIN_EPOCH = 50
+PRETRAIN_EPOCH = 100
 
-SUBSET_FRACTION = 1
+SUBSET_FRACTION = 5
 
-s1_pt_name = "/data/libero/exp_results/deo.pt"
+s1_pt_name = "/data/libero/exp_results/dynamo_origianl_ft.pt"
 #################### ARGUMENTS #####################
 
 def main():
@@ -106,7 +106,7 @@ def main():
             vqvae_latent_dim=512,
             vqvae_n_embed=16,
             vqvae_groups=2,
-            vqvae_fit_steps=1946,
+            vqvae_fit_steps=374,
             vqvae_iters=600,
             n_layer=6,
             n_head=6,
@@ -128,7 +128,7 @@ def main():
         # calculate goal embeddings for each task
         goals_cache = []
         for i in range(10):
-            idx = i * 50
+            idx = i * (50 // SUBSET_FRACTION)
             last_obs, _, _ = dataset.get_frames(idx, [-1])  # 1 V C H W
             last_obs = last_obs.to(DEVICE)
             embd = encoder(last_obs)[0]  # V E
@@ -207,6 +207,8 @@ def main():
                     eval_pbar.set_description("total_reward : {0}".format(avg_reward))
                 avg_reward += total_reward
                 completion_id_list.append(info["all_completions_ids"])
+        print("eval_on_env : {}".format(avg_reward / (num_evals * num_eval_per_goal)))
+        print()
         return (
             avg_reward / (num_evals * num_eval_per_goal),
             completion_id_list,
@@ -218,14 +220,14 @@ def main():
     reward_history = []
     for epoch in tqdm.trange(PRETRAIN_EPOCH):
         cbet_model.eval()
-        if epoch % 5 == 0:
+        if epoch % 5 == 0 and epoch > 10:
             avg_reward, completion_id_list, max_coverage, final_coverage = eval_on_env(
                 epoch=epoch,
-                num_eval_per_goal=10,
+                num_eval_per_goal=20,
             )
             reward_history.append(avg_reward)
 
-        if epoch % 10 == 0:
+        if epoch % 10 == 0 and epoch > 0:
             total_loss = 0
             action_diff = 0
             action_diff_tot = 0

@@ -36,7 +36,7 @@ def seed_everything(random_seed: int):
     random.seed(random_seed)
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:2'
+DEVICE = 'cuda:1'
 ENCODER_PATH = "pretrained_model/encoder_6.pt"
 SNAPSHOT_PATH = "pretrained_model/snapshot_6.pt"
 
