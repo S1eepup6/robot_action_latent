@@ -10,6 +10,7 @@ from transformers import BertTokenizer, BertModel
 import re
 from tqdm import tqdm
 import pickle
+import random
 
 ### Compute the bert embedding of the task description
 def get_task_embedding(task_name):
@@ -71,7 +72,7 @@ class LiberoGoalDataset(TrajectoryDataset):
         if self.subset_fraction > 1:
             assert 50 % self.subset_fraction == 0
             # n = int(len(self.demos) * self.subset_fraction)
-            self.demos = self.demos[::self.subset_fraction]
+            self.demos = self.demos[random.randint(0, self.subset_fraction)::self.subset_fraction]
 
         # prefetch all npy data
         self.joint_pos = []

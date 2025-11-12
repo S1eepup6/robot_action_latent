@@ -36,7 +36,7 @@ def seed_everything(random_seed: int):
     random.seed(random_seed)
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:2'
+DEVICE = 'cuda:0'
 ENCODER_PATH = "pretrained_model/encoder_6.pt"
 SNAPSHOT_PATH = "pretrained_model/snapshot_6.pt"
 
@@ -54,16 +54,18 @@ ACTION_WINDOW_SIZE = 1
 BATCH_SIZE = 32
 if TRAIN:
     NUM_EVAL_PER_GOAL = 20
-    PRETRAIN_EPOCH = 50
+    PRETRAIN_EPOCH = 100
     FINETUNE_EPOCH = 100
     SUBSET_FRACTION_PRETRAIN = 1
-    SUBSET_FRACTION_FINETUNE = 1
+    SUBSET_FRACTION_FINETUNE = 10
+    VQVAE_FIT_STEPS = 180
 else: # TEST 
     NUM_EVAL_PER_GOAL = 1
     PRETRAIN_EPOCH = 1
     FINETUNE_EPOCH = 2
     SUBSET_FRACTION_PRETRAIN = 25
     SUBSET_FRACTION_FINETUNE = 25
+    VQVAE_FIT_STEPS = 157
 
 s1_pt_name = "/data/libero/exp_results/do2_1.pt"
 s2_pt_name = "/data/libero/exp_results/do2_2.pt"
@@ -74,7 +76,7 @@ def main():
 
     encoder = torch.load(ENCODER_PATH).to(DEVICE).eval()
 
-    dataset = LiberoGoalDataset(subset_fraction=SUBSET_FRACTION_FINETUNE)
+    dataset = LiberoGoalDataset(subset_fraction=SUBSET_FRACTION_PRETRAIN)
 
     train_data, test_data = split_traj_datasets(
         dataset,
@@ -132,7 +134,7 @@ def main():
             vqvae_latent_dim=512,
             vqvae_n_embed=16,
             vqvae_groups=2,
-            vqvae_fit_steps=1889,
+            vqvae_fit_steps=VQVAE_FIT_STEPS,
             vqvae_iters=600,
             n_layer=6,
             n_head=6,
@@ -253,6 +255,8 @@ def main():
                 avg_reward += total_reward
                 completion_id_list.append(info["all_completions_ids"])
         print()
+        print(avg_reward / (num_evals * num_eval_per_goal))
+        print()
         return (
             avg_reward / (num_evals * num_eval_per_goal),
             completion_id_list,
@@ -337,7 +341,7 @@ def main():
 
     for epoch in tqdm.trange(FINETUNE_EPOCH):
         decoder.eval()
-        if epoch % 5 == 0 and epoch > 0:
+        if epoch % 5 == 0 and epoch >= 30:
             avg_reward, completion_id_list, max_coverage, final_coverage = eval_on_env(
                 epoch=epoch,
                 num_eval_per_goal=NUM_EVAL_PER_GOAL,

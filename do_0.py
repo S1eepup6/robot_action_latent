@@ -20,7 +20,7 @@ from utils.vqbet_repro import TrajectorySlicerDataset
 from utils.libero_dataset import LiberoGoalDataset
 
 from models.vq_behavior_transformer.gpt import GPT, GPTConfig
-from models.vq_behavior_transformer.bet import BehaviorTransformer
+from models.vq_behavior_transformer.bet_dynamo import BehaviorTransformer
 
 
 if "MUJOCO_GL" not in os.environ:
@@ -54,7 +54,7 @@ PRETRAIN_EPOCH = 100
 
 SUBSET_FRACTION = 1
 
-s1_pt_name = "/data/libero/exp_results/dynamo_origianl_ft.pt"
+s1_pt_name = "/data/libero/exp_results/dynamo_origianl_ft_subset1.pt"
 #################### ARGUMENTS #####################
 
 def main():

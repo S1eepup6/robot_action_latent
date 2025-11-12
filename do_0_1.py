@@ -20,7 +20,7 @@ from utils.vqbet_repro import TrajectorySlicerDataset
 from utils.libero_dataset import LiberoGoalDataset
 
 from models.vq_behavior_transformer.gpt import GPT, GPTConfig
-from models.vq_behavior_transformer.bet import BehaviorTransformer
+from models.vq_behavior_transformer.bet_dynamo import BehaviorTransformer
 
 
 if "MUJOCO_GL" not in os.environ:
@@ -34,12 +34,12 @@ def seed_everything(random_seed: int):
     random.seed(random_seed)
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:0'
+DEVICE = 'cuda:1'
 ENCODER_PATH = "pretrained_model/encoder_6.pt"
 SNAPSHOT_PATH = "pretrained_model/snapshot_6.pt"
 
 TRAIN = True
-SEED = 42
+SEED = 13
 
 STAGE = 5
 
@@ -52,9 +52,9 @@ ACTION_WINDOW_SIZE = 1
 BATCH_SIZE = 32
 PRETRAIN_EPOCH = 100
 
-SUBSET_FRACTION = 2
+SUBSET_FRACTION = 10
 
-s1_pt_name = "/data/libero/exp_results/dynamo_origianl_ft_0.pt"
+s1_pt_name = "/data/libero/exp_results/dynamo_origianl_ft_subset10.pt"
 #################### ARGUMENTS #####################
 
 def main():
