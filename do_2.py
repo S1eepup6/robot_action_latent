@@ -41,7 +41,7 @@ ENCODER_PATH = "pretrained_model/encoder_6.pt"
 SNAPSHOT_PATH = "pretrained_model/snapshot_6.pt"
 
 TRAIN = True
-SEED = 42
+SEED = 31
 
 STAGE = 5
 
@@ -57,7 +57,7 @@ if TRAIN:
     PRETRAIN_EPOCH = 100
     FINETUNE_EPOCH = 100
     SUBSET_FRACTION_PRETRAIN = 1
-    SUBSET_FRACTION_FINETUNE = 10
+    SUBSET_FRACTION_FINETUNE = 5
     VQVAE_FIT_STEPS = 180
 else: # TEST 
     NUM_EVAL_PER_GOAL = 1
@@ -341,7 +341,7 @@ def main():
 
     for epoch in tqdm.trange(FINETUNE_EPOCH):
         decoder.eval()
-        if epoch % 5 == 0 and epoch >= 30:
+        if epoch % 10 == 0 and epoch >= 60:
             avg_reward, completion_id_list, max_coverage, final_coverage = eval_on_env(
                 epoch=epoch,
                 num_eval_per_goal=NUM_EVAL_PER_GOAL,

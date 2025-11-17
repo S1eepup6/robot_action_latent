@@ -39,7 +39,7 @@ ENCODER_PATH = "pretrained_model/encoder_6.pt"
 SNAPSHOT_PATH = "pretrained_model/snapshot_6.pt"
 
 TRAIN = True
-SEED = 42
+SEED = 68
 
 STAGE = 5
 
@@ -52,9 +52,9 @@ ACTION_WINDOW_SIZE = 1
 BATCH_SIZE = 32
 PRETRAIN_EPOCH = 100
 
-SUBSET_FRACTION = 1
+SUBSET_FRACTION = 5
 
-s1_pt_name = "/data/libero/exp_results/dynamo_origianl_ft_subset1.pt"
+s1_pt_name = "/data/libero/exp_results/dynamo_origianl_ft_subset_2.pt"
 #################### ARGUMENTS #####################
 
 def main():
@@ -106,7 +106,7 @@ def main():
             vqvae_latent_dim=512,
             vqvae_n_embed=16,
             vqvae_groups=2,
-            vqvae_fit_steps=1867,
+            vqvae_fit_steps=374,
             vqvae_iters=600,
             n_layer=6,
             n_head=6,
@@ -220,7 +220,7 @@ def main():
     reward_history = []
     for epoch in tqdm.trange(PRETRAIN_EPOCH):
         cbet_model.eval()
-        if epoch % 5 == 0 and epoch > 10:
+        if epoch % 10 == 0 and epoch >= 60:
             avg_reward, completion_id_list, max_coverage, final_coverage = eval_on_env(
                 epoch=epoch,
                 num_eval_per_goal=20,
@@ -250,7 +250,9 @@ def main():
             print(f"Test loss: {total_loss / len(test_loader)}")
 
         cbet_model.train()
-        for data in tqdm.tqdm(train_loader):
+        
+        train_pbar = tqdm.tqdm(train_loader)
+        for data in train_pbar:
             optimizer.zero_grad()
             obs, act, goal = (x.to(DEVICE) for x in data)
             obs = einops.rearrange(obs, "N T V E -> N T (V E)")
@@ -258,6 +260,7 @@ def main():
             predicted_act, loss, loss_dict = cbet_model(obs, goal, act)
             loss.backward()
             optimizer.step()
+            train_pbar.set_description("EPOCH {0}, loss {1:.6f}".format(epoch, loss.item()))
         torch.save(cbet_model, s1_pt_name)
 
     avg_reward, completion_id_list, max_coverage, final_coverage = eval_on_env(

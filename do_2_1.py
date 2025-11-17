@@ -36,12 +36,12 @@ def seed_everything(random_seed: int):
     random.seed(random_seed)
 
 #################### ARGUMENTS #####################
-DEVICE = 'cuda:2'
+DEVICE = 'cuda:1'
 ENCODER_PATH = "pretrained_model/encoder_6.pt"
 SNAPSHOT_PATH = "pretrained_model/snapshot_6.pt"
 
 TRAIN = True
-SEED = 13
+SEED = 325
 
 STAGE = 5
 
@@ -341,7 +341,7 @@ def main():
 
     for epoch in tqdm.trange(FINETUNE_EPOCH):
         decoder.eval()
-        if epoch % 5 == 0 and epoch >= 30:
+        if epoch % 10 == 0 and epoch >= 60:
             avg_reward, completion_id_list, max_coverage, final_coverage = eval_on_env(
                 epoch=epoch,
                 num_eval_per_goal=NUM_EVAL_PER_GOAL,
