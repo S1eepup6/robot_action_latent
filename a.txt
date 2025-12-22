@@ -14,6 +14,9 @@ tensorboard --logdir=runs
 
 tmux new -s 
 
+cd robot_action_latent
+conda activate dynamo-repro
+
 git add .
 git commit -m "Commit Time 0914"
 git push
@@ -31,19 +34,28 @@ python3 train.py --config-name=train_libero_goal && MUJOCO_GL=egl python3 online
 --------------------------------------------------
 
 0.81 - 전체 최대
-원래 골 포함하면 0.875
+원래 골 포함하면 0.875 86 865 855 86 = 86.3
+
+865
+855
+820
+865
+885
+= 85.8
 
 50%
-proposed 0.78 / 0.825 / 0.84
+proposed 0.78 / 0.825 / 0.84 / 0.81 / 0.815
+0.75
 0.78
-0.855
+0.835
 0.825
+0.805
 = 0.82
 
 10%
-propsed 0.76 / 0.74 / 0.715 / 0.76 / 0.73
+propsed 0.76 / 0.74 / 0.76 / 0.73 / 0.725
 0.69
-0.73
+0.645
 0.715
 0.715
 0.725
@@ -62,3 +74,19 @@ dynamo
 0.49
 0.54
 0.565
+
+
+
+---------- Time Step 12
+- 50
+790 790 775
+
+
+- 25
+725 680
+
+- 10
+585 575
+
+-5
+300 315

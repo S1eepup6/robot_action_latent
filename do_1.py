@@ -41,7 +41,7 @@ ENCODER_PATH = "pretrained_model/encoder_6.pt"
 SNAPSHOT_PATH = "pretrained_model/snapshot_6.pt"
 
 TRAIN = True
-SEED = 42
+SEED = 32
 
 STAGE = 5
 
@@ -54,16 +54,18 @@ ACTION_WINDOW_SIZE = 1
 BATCH_SIZE = 32
 if TRAIN:
     NUM_EVAL_PER_GOAL = 10
-    PRETRAIN_EPOCH = 50
-    FINETUNE_EPOCH = 50
+    PRETRAIN_EPOCH = 100
+    FINETUNE_EPOCH = 100
     SUBSET_FRACTION_PRETRAIN = 1
-    SUBSET_FRACTION_FINETUNE = 5
+    SUBSET_FRACTION_FINETUNE = 2
+    VQVAE_FIT_STEPS = 1000
 else: # TEST 
     NUM_EVAL_PER_GOAL = 1
     PRETRAIN_EPOCH = 1
     FINETUNE_EPOCH = 2
     SUBSET_FRACTION_PRETRAIN = 25
     SUBSET_FRACTION_FINETUNE = 25
+    VQVAE_FIT_STEPS = 940
 
 s1_pt_name = "/data/libero/exp_results/do1_1.pt"
 s2_pt_name = "/data/libero/exp_results/do1_2.pt"
@@ -132,7 +134,7 @@ def main():
             vqvae_latent_dim=512,
             vqvae_n_embed=16,
             vqvae_groups=2,
-            vqvae_fit_steps=941,
+            vqvae_fit_steps=VQVAE_FIT_STEPS,
             vqvae_iters=600,
             n_layer=6,
             n_head=6,
@@ -335,7 +337,7 @@ def main():
 
     for epoch in tqdm.trange(FINETUNE_EPOCH):
         decoder.eval()
-        if epoch % 5 == 0 and epoch > 0:
+        if epoch % 10 == 0 and epoch >= 50:
             avg_reward, completion_id_list, max_coverage, final_coverage = eval_on_env(
                 epoch=epoch,
                 num_eval_per_goal=NUM_EVAL_PER_GOAL,

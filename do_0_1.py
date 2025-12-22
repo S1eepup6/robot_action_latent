@@ -39,7 +39,7 @@ ENCODER_PATH = "pretrained_model/encoder_6.pt"
 SNAPSHOT_PATH = "pretrained_model/snapshot_6.pt"
 
 TRAIN = True
-SEED = 66
+SEED = 63
 
 STAGE = 5
 
@@ -50,9 +50,9 @@ WINDOW_SIZE = OBS_SIZE + FUTURE_SIZE
 ACTION_WINDOW_SIZE = 1
 
 BATCH_SIZE = 32
-PRETRAIN_EPOCH = 100
+PRETRAIN_EPOCH = 50
 
-SUBSET_FRACTION = 5
+SUBSET_FRACTION = 1
 
 s1_pt_name = "/data/libero/exp_results/dynamo_origianl_ft_subset_0.pt"
 #################### ARGUMENTS #####################
@@ -106,7 +106,7 @@ def main():
             vqvae_latent_dim=512,
             vqvae_n_embed=16,
             vqvae_groups=2,
-            vqvae_fit_steps=374,
+            vqvae_fit_steps=940,
             vqvae_iters=600,
             n_layer=6,
             n_head=6,
@@ -220,7 +220,7 @@ def main():
     reward_history = []
     for epoch in tqdm.trange(PRETRAIN_EPOCH):
         cbet_model.eval()
-        if epoch % 10 == 0 and epoch >= 60:
+        if epoch % 5 == 0 and epoch >= 5:
             avg_reward, completion_id_list, max_coverage, final_coverage = eval_on_env(
                 epoch=epoch,
                 num_eval_per_goal=20,
